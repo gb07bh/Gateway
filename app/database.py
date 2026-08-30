@@ -80,9 +80,39 @@ class DatabaseManager:
         """Returns a new SQLAlchemy session."""
         return self.SessionLocal()
 
+    def _ensure_database_exists(self) -> bool:
+        """Attempts to create the target PostgreSQL database if it does not exist when table_creations is enabled."""
+        if not getattr(self.config, "table_creations", True):
+            return False
+
+        maintenance_db = os.environ.get("POSTGRES_MAINTENANCE_DB", "postgres")
+        maint_url = f"postgresql://{self.config.user}:{self.config.password}@{self.config.host}:{self.config.port}/{maintenance_db}"
+
+        try:
+            maint_engine = create_engine(
+                maint_url,
+                isolation_level="AUTOCOMMIT",
+                connect_args={"connect_timeout": 3},
+            )
+            with maint_engine.connect() as conn:
+                result = conn.execute(
+                    text("SELECT 1 FROM pg_database WHERE datname = :dbname"),
+                    {"dbname": self.config.name},
+                )
+                if not result.scalar():
+                    conn.execute(text(f'CREATE DATABASE "{self.config.name}"'))
+                    maint_engine.dispose()
+                    return True
+            maint_engine.dispose()
+        except Exception:
+            # If user lacks CREATEDB privilege or maintenance DB is inaccessible, defer to standard engine connection
+            pass
+        return False
+
     def create_tables(self) -> bool:
-        """Automatically creates database tables if config.table_creations is enabled."""
+        """Automatically creates database and tables if config.table_creations is enabled."""
         if getattr(self.config, "table_creations", True):
+            self._ensure_database_exists()
             Base.metadata.create_all(bind=self.engine)
             return True
         return False

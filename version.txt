@@ -1,0 +1,28 @@
+1.5.0
+- Automated test suite integration and pytest module validation
+- Configuration validation CLI command support in startup scripts
+- Multi-node health monitoring and database pool validation
+
+1.4.0
+- Cross-platform startup scripts (startup.sh, startup.ps1, startup.bat)
+- Jinja configuration rendering and Ansible/Terraform template support
+- Automated log rotation and housekeeping manager integration
+
+1.3.0
+- Vendor-neutral adapter interface with Digital.ai, Jenkins, and Mock providers
+- Structured JSON logging (audit.log, console.log, service.log)
+- Request correlation ID propagation across HTTP headers and loggers
+
+1.2.0
+- Fail-closed release classification engine for DEV, APS, and PROD tags
+- Project-scoped service account credential resolution via CredentialResolver
+- Secret redaction filter for credentials in logs and audit traces
+
+1.1.0
+- Server-side authorization evaluator for DEV and APS execution roles
+- Immutable user identity normalization from SSO headers (X-Remote-User, X-Remote-Groups)
+- UI blueprint and REST API endpoints implementation
+
+1.0.0
+- Initial release of Digital.ai Release Gateway execution middleware
+- Basic HTTP server structure and Flask application factory initialization

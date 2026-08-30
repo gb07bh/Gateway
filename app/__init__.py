@@ -39,9 +39,6 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     auth_evaluator = AuthorizationEvaluator(config.auth, config.classification)
     app.config["AUTH_EVALUATOR"] = auth_evaluator
 
-    audit_logger = AuditLogger(loggers.audit_logger)
-    app.config["AUDIT_LOGGER"] = audit_logger
-
     active_adapter = AdapterFactory.create_adapter(config.adapters)
     app.config["ACTIVE_ADAPTER"] = active_adapter
 
@@ -49,10 +46,13 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     if config.database.table_creations:
         try:
             db_manager.create_tables()
-            loggers.service_logger.info("Database auto table creation verified (table_creations=true)")
+            loggers.db_logger.info("Database auto table creation verified (table_creations=true)")
         except Exception as e:
-            loggers.service_logger.warning(f"Database auto table creation check deferred/warning: {e}")
+            loggers.db_logger.warning(f"Database auto table creation check deferred/warning: {e}")
     app.config["DB_MANAGER"] = db_manager
+
+    audit_logger = AuditLogger(loggers.audit_logger, db_manager=db_manager, db_logger=loggers.db_logger)
+    app.config["AUDIT_LOGGER"] = audit_logger
 
     housekeeping_manager = HousekeepingManager(config.housekeeping, config.logging, db_manager=db_manager)
     app.config["HOUSEKEEPING_MANAGER"] = housekeeping_manager
