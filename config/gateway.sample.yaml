@@ -1,0 +1,175 @@
+# ==============================================================================
+# DIGITAL.AI RELEASE GATEWAY - COMPLETE SAMPLE CONFIGURATION
+# ==============================================================================
+# This sample YAML file contains all available configuration fields used by the
+# Gateway application schema. Inline comments explain the purpose, importance,
+# default values, and impact of each field.
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. SERVER CONFIGURATION
+# ------------------------------------------------------------------------------
+server:
+  # [IMPORTANCE: CRITICAL] Interface IP address the HTTP WSGI server binds to.
+  # - "0.0.0.0": Listens on all network interfaces (required for container/ALB traffic).
+  # - "127.0.0.1": Restricts access to localhost only (for local testing).
+  host: "0.0.0.0"
+
+  # [IMPORTANCE: CRITICAL] TCP port the Gateway application listens on.
+  # Must match Apache HTTPD / ALB upstream target port.
+  port: 5510
+
+
+  # [IMPORTANCE: HIGH] Unique node identifier for log correlation and multi-node scaling.
+  # Essential when multiple Gateway nodes run behind a load balancer.
+  node_id: "gateway-node-01"
+
+# ------------------------------------------------------------------------------
+# 2. LOGGING CONFIGURATION
+# ------------------------------------------------------------------------------
+logging:
+  # [IMPORTANCE: HIGH] Directory path where log files are stored.
+  # Can be relative to project root (e.g. "logs") or absolute path (e.g. "/var/log/gateway").
+  dir: "logs"
+
+  # [IMPORTANCE: CRITICAL] Filename for security & compliance audit trail.
+  # Records human identity, requested action, project, role, service account, and execution status.
+  audit_file: "audit.log"
+
+  # [IMPORTANCE: HIGH] Filename for HTTP access metrics and request logs.
+  # Tracks request duration, HTTP method, URI path, status code, and correlation ID.
+  console_file: "console.log"
+
+  # [IMPORTANCE: HIGH] Filename for internal technical service logs.
+  # Logs server lifecycle, configuration load, database state, and technical errors.
+  service_file: "service.log"
+
+  # [IMPORTANCE: MEDIUM] Minimum severity level for log output.
+  # Options: "DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL". Default: "INFO".
+  level: "INFO"
+
+# ------------------------------------------------------------------------------
+# 3. SSO & IDENTITY CONFIGURATION
+# ------------------------------------------------------------------------------
+identity:
+  # [IMPORTANCE: CRITICAL] HTTP header containing the authenticated user's ID/username.
+  # Set by Apache HTTPD / SSO reverse proxy after authentication (e.g. "X-Remote-User").
+  header_user: "X-Remote-User"
+
+  # [IMPORTANCE: CRITICAL] HTTP header containing comma-separated LDAP user groups.
+  # Used to derive user's accessible projects and execution roles (e.g. "X-Remote-Groups").
+  header_groups: "X-Remote-Groups"
+
+  # [IMPORTANCE: CRITICAL] Group name prefix used to parse project name and role.
+  # Expected format: <prefix><PROJECT_NAME>_<ROLE> (e.g., "DAI_ProjectA_DEV").
+  group_prefix: "DAI_"
+
+# ------------------------------------------------------------------------------
+# 4. AUTHORIZATION CONFIGURATION
+# ------------------------------------------------------------------------------
+auth:
+  # [IMPORTANCE: CRITICAL] List of normalized LDAP roles authorized for release execution.
+  # Non-listed roles (such as "AUDIT" or "DESIGNER") will fail authorization checks closed.
+  eval_roles:
+    - "DEV"
+    - "APS"
+
+# ------------------------------------------------------------------------------
+# 5. RELEASE CLASSIFICATION CONFIGURATION
+# ------------------------------------------------------------------------------
+classification:
+  # [IMPORTANCE: MEDIUM] Metadata provider strategy for release environment tagging.
+  # Default provider: "tags".
+  default_provider: "tags"
+
+  # [IMPORTANCE: CRITICAL] Fail-closed mapping of execution roles to allowed release environment tags.
+  # Prevents DEV users from executing production/APS releases and vice versa.
+  allowed_tags:
+    DEV:
+      - "dev"
+      - "development"
+      - "sandbox"
+    APS:
+      - "aps"
+      - "prod"
+      - "production"
+      - "release"
+
+# ------------------------------------------------------------------------------
+# 6. DOWNSTREAM ADAPTERS CONFIGURATION
+# ------------------------------------------------------------------------------
+adapters:
+  # [IMPORTANCE: CRITICAL] Active downstream execution adapter driver.
+  # Options:
+  #   - "mock": Standalone mock adapter for testing without external dependencies.
+  #   - "digitalai": Real Digital.ai Release REST API adapter.
+  active: "mock"
+
+  # [IMPORTANCE: HIGH] Maximum HTTP request timeout (in seconds) for downstream calls.
+  timeout_seconds: 30
+
+  # Settings for the "mock" adapter driver
+  mock:
+    # [IMPORTANCE: LOW] Simulated processing delay (seconds) for mock execution calls.
+    simulate_delay_seconds: 0.1
+
+  # Settings for the "digitalai" adapter driver
+  digitalai:
+    # [IMPORTANCE: CRITICAL] Base URL of the target Digital.ai Release instance.
+    url: "https://digitalai.company.internal"
+
+    # [IMPORTANCE: HIGH] REST API path endpoint for triggering release executions.
+    trigger_path: "/api/v1/releases/trigger"
+
+    # [IMPORTANCE: HIGH] REST API path endpoint for checking execution status.
+    status_path: "/api/v1/releases/executions"
+
+# ------------------------------------------------------------------------------
+# 7. POSTGRESQL DATABASE CONFIGURATION
+# ------------------------------------------------------------------------------
+database:
+  # [IMPORTANCE: CRITICAL] PostgreSQL database server hostname or IP address.
+  host: "localhost"
+
+  # [IMPORTANCE: CRITICAL] PostgreSQL database port (default: 5432).
+  port: 5432
+
+  # [IMPORTANCE: CRITICAL] Database name for persistent audit & execution records.
+  name: "gateway_db"
+
+  # [IMPORTANCE: CRITICAL] Database authentication username.
+  user: "gateway_user"
+
+  # [IMPORTANCE: CRITICAL] Database authentication password.
+  password: "gateway_password"
+
+  # [IMPORTANCE: HIGH] Baseline size of the SQLAlchemy persistent connection pool.
+  pool_size: 10
+
+  # [IMPORTANCE: HIGH] Maximum additional temporary connections beyond pool_size allowed during spikes.
+  max_overflow: 20
+
+  # [IMPORTANCE: MEDIUM] Timeout (in seconds) waiting to acquire a connection from pool before erroring.
+  pool_timeout: 30
+
+  # [IMPORTANCE: MEDIUM] Seconds after which inactive connections are recycled (prevents stale TCP drops).
+  pool_recycle: 1800
+
+# ------------------------------------------------------------------------------
+# 8. HOUSEKEEPING & MAINTENANCE CONFIGURATION
+# ------------------------------------------------------------------------------
+housekeeping:
+  # [IMPORTANCE: HIGH] Master toggle for automated housekeeping maintenance routines.
+  enabled: true
+
+  # [IMPORTANCE: HIGH] Retention window (in days) for audit records, execution logs, and archived log zips.
+  retention_days: 30
+
+  # [IMPORTANCE: MEDIUM] Log file size threshold (in MB) that triggers automatic compression/rotation.
+  max_log_size_mb: 50.0
+
+  # [IMPORTANCE: MEDIUM] Storage disk utilization percentage threshold triggering warning alerts.
+  max_disk_usage_percent: 85.0
+
+  # [IMPORTANCE: HIGH] Automatically compress and clear active log files when max_log_size_mb is reached.
+  auto_rotate_logs: true

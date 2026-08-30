@@ -1,0 +1,108 @@
+import os
+from typing import Dict, Any, Optional
+from sqlalchemy import create_engine, text, Column, String, DateTime, Text
+from sqlalchemy.orm import sessionmaker, declarative_base
+from datetime import datetime, timezone
+from app.config import DatabaseConfig
+
+Base = declarative_base()
+
+
+class DatabaseConnectionError(Exception):
+    """Raised when PostgreSQL database engine initialization or connection fails."""
+    pass
+
+
+class AuditLogRecord(Base):
+    """PostgreSQL persistent audit table model."""
+    __tablename__ = "gateway_audit_logs"
+
+    id = Column(String(64), primary_key=True)
+    request_id = Column(String(64), nullable=False, index=True)
+    human_uid = Column(String(128), nullable=False, index=True)
+    action = Column(String(64), nullable=False)
+    project = Column(String(128), nullable=False)
+    release = Column(String(128), nullable=False)
+    service_account = Column(String(128), nullable=False)
+    downstream_execution_id = Column(String(128), nullable=True)
+    status = Column(String(32), nullable=False)
+    reason = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class ExecutionRecord(Base):
+    """PostgreSQL persistent execution record model."""
+    __tablename__ = "gateway_execution_records"
+
+    execution_id = Column(String(128), primary_key=True)
+    request_id = Column(String(64), nullable=False, index=True)
+    project_name = Column(String(128), nullable=False)
+    release_name = Column(String(128), nullable=False)
+    service_account = Column(String(128), nullable=False)
+    triggered_by_user = Column(String(128), nullable=False)
+    status = Column(String(32), nullable=False)
+    details_json = Column(Text, nullable=True)
+    created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class DatabaseManager:
+    """Manages PostgreSQL database engine, connection pooling, and sessions. No SQLite fallback permitted."""
+
+    def __init__(self, config: DatabaseConfig, lazy_connect: bool = True):
+        self.config = config
+        self.lazy_connect = lazy_connect
+        self.engine = self._create_engine_instance()
+        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
+
+    def _create_engine_instance(self):
+        db_url = f"postgresql://{self.config.user}:{self.config.password}@{self.config.host}:{self.config.port}/{self.config.name}"
+        
+        try:
+            engine = create_engine(
+                db_url,
+                pool_size=self.config.pool_size,
+                max_overflow=self.config.max_overflow,
+                pool_timeout=self.config.pool_timeout,
+                pool_recycle=self.config.pool_recycle,
+                pool_pre_ping=True,
+                connect_args={"connect_timeout": 3},
+            )
+            if not self.lazy_connect:
+                with engine.connect() as conn:
+                    conn.execute(text("SELECT 1"))
+            return engine
+        except Exception as exc:
+            raise DatabaseConnectionError(
+                f"Failed to connect to PostgreSQL database '{self.config.name}' at {self.config.host}:{self.config.port}: {exc}"
+            )
+
+    def get_session(self):
+        """Returns a new SQLAlchemy session."""
+        return self.SessionLocal()
+
+    def create_tables(self) -> bool:
+        """Automatically creates database tables if config.table_creations is enabled."""
+        if getattr(self.config, "table_creations", True):
+            Base.metadata.create_all(bind=self.engine)
+            return True
+        return False
+
+    def check_health(self) -> Dict[str, Any]:
+        """Checks PostgreSQL database connectivity health."""
+        try:
+            with self.engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            return {
+                "status": "HEALTHY",
+                "engine": "postgresql",
+                "host": self.config.host,
+                "port": self.config.port,
+                "database": self.config.name,
+                "pool_size": self.config.pool_size,
+            }
+        except Exception as e:
+            return {
+                "status": "UNHEALTHY",
+                "engine": "postgresql",
+                "error": str(e),
+            }

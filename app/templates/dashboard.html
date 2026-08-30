@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Gateway Dashboard{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>User Authenticated Details (SSO Normalization)</h2>
+    <p><strong>Username (UID):</strong> {{ user.username }}</p>
+    <p><strong>Display Name:</strong> {{ user.display_name }}</p>
+    <p><strong>Raw SSO/LDAP Groups:</strong></p>
+    <div>
+        {% for grp in user.raw_groups %}
+            <span class="tag">{{ grp }}</span>
+        {% else %}
+            <em>No raw LDAP groups passed in headers.</em>
+        {% endfor %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>Project & Role Memberships</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Project Name</th>
+                <th>Assigned Roles</th>
+                <th>Gateway Authorized Roles</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for project_name, roles in user.projects.items() %}
+            <tr>
+                <td><strong>{{ project_name }}</strong></td>
+                <td>
+                    {% for r in roles %}
+                        <span class="tag {% if r == 'DEV' %}tag-dev{% elif r == 'APS' %}tag-aps{% endif %}">{{ r }}</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if 'DEV' in roles or 'APS' in roles %}
+                        <span style="color: var(--success); font-weight: 600;">✓ Authorized</span>
+                    {% else %}
+                        <span style="color: var(--text-muted);">Designer/Audit Only</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="3">No project memberships parsed from SSO groups.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>Trigger Release Execution (Phase 2 Mock Pipeline)</h2>
+    <div id="alert-box" style="display: none;"></div>
+    <form id="trigger-form">
+        <div class="form-group">
+            <label for="project_name">Select Authorized Project</label>
+            <select id="project_name" name="project_name" required>
+                {% for project_name, roles in user.projects.items() %}
+                    {% if 'DEV' in roles or 'APS' in roles %}
+                        <option value="{{ project_name }}">{{ project_name }}</option>
+                    {% endif %}
+                {% endfor %}
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="execution_role">Execution Role</label>
+            <select id="execution_role" name="execution_role" required>
+                <option value="DEV">DEV (Triggers Dev Pipeline)</option>
+                <option value="APS">APS (Triggers Production / APS Pipeline)</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label for="release_name">Release Pipeline Name</label>
+            <input type="text" id="release_name" name="release_name" value="Release-v1.0.0" required>
+        </div>
+        <div class="form-group">
+            <label for="classification_tag">Release Classification Tag</label>
+            <input type="text" id="classification_tag" name="classification_tag" value="dev" required>
+            <small style="color: var(--text-muted);">Valid tags: DEV role = 'dev', 'sandbox' | APS role = 'aps', 'prod', 'release'</small>
+        </div>
+        <button type="submit" class="btn">Trigger Execution</button>
+    </form>
+</div>
+
+<script>
+document.getElementById('trigger-form').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    const alertBox = document.getElementById('alert-box');
+    alertBox.style.display = 'none';
+
+    const payload = {
+        project_name: document.getElementById('project_name').value,
+        execution_role: document.getElementById('execution_role').value,
+        release_name: document.getElementById('release_name').value,
+        classification_tag: document.getElementById('classification_tag').value
+    };
+
+    try {
+        const response = await fetch('/api/v1/execute', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        const data = await response.json();
+        if (response.ok) {
+            alertBox.className = 'alert alert-success';
+            alertBox.innerHTML = `<strong>Success!</strong> Execution ID: ${data.execution_id} | Status: ${data.status} | SA: ${data.service_account}`;
+            alertBox.style.display = 'block';
+        } else {
+            alertBox.className = 'alert alert-error';
+            alertBox.innerHTML = `<strong>Error:</strong> ${data.error || 'Trigger failed'}`;
+            alertBox.style.display = 'block';
+        }
+    } catch (err) {
+        alertBox.className = 'alert alert-error';
+        alertBox.innerHTML = `<strong>Request Failed:</strong> ${err.message}`;
+        alertBox.style.display = 'block';
+    }
+});
+</script>
+{% endblock %}

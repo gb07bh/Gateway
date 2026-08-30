@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Release Execution Detail{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Execution Details: <span id="exec-id">{{ execution_id }}</span></h2>
+    <div id="status-card">
+        <p>Loading execution status...</p>
+    </div>
+    <a href="/dashboard" class="btn" style="display: inline-block; text-decoration: none; margin-top: 1rem;">Back to Dashboard</a>
+</div>
+
+<script>
+async function loadStatus() {
+    const execId = document.getElementById('exec-id').innerText;
+    const card = document.getElementById('status-card');
+    try {
+        const response = await fetch(`/api/v1/execution/${execId}`);
+        const data = await response.json();
+        if (response.ok) {
+            card.innerHTML = `
+                <p><strong>Project:</strong> ${data.project_name}</p>
+                <p><strong>Release:</strong> ${data.release_name}</p>
+                <p><strong>Service Account:</strong> ${data.service_account}</p>
+                <p><strong>Status:</strong> <span class="tag ${data.status === 'COMPLETED' ? 'tag-aps' : 'tag-dev'}">${data.status}</span></p>
+                <p><strong>Message:</strong> ${data.message}</p>
+                <p><strong>Created At:</strong> ${data.created_at}</p>
+            `;
+        } else {
+            card.innerHTML = `<div class="alert alert-error">Execution not found: ${data.error}</div>`;
+        }
+    } catch(err) {
+        card.innerHTML = `<div class="alert alert-error">Failed to fetch status: ${err.message}</div>`;
+    }
+}
+loadStatus();
+</script>
+{% endblock %}

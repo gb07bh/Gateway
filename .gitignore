@@ -1,0 +1,8 @@
+.pytest*
+*/__pycache*
+Ansible/*
+logs/*
+tests/*
+venv/*
+*.md
+*__pycache__

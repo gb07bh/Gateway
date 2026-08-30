@@ -1,0 +1,66 @@
+server:
+  host: "127.0.0.1"
+  port: 5510
+
+  node_id: "gateway-node-01"
+
+
+logging:
+  dir: "logs"
+  audit_file: "audit.log"
+  console_file: "console.log"
+  service_file: "service.log"
+  level: "INFO"
+
+identity:
+  header_user: "X-Remote-User"
+  header_groups: "X-Remote-Groups"
+  group_prefix: "DAI_"
+
+auth:
+  eval_roles:
+    - "DEV"
+    - "APS"
+
+classification:
+  default_provider: "tags"
+  allowed_tags:
+    DEV:
+      - "dev"
+      - "development"
+      - "sandbox"
+    APS:
+      - "aps"
+      - "prod"
+      - "production"
+      - "release"
+
+adapters:
+  active: "mock"
+  timeout_seconds: 30
+  mock:
+    simulate_delay_seconds: 0.1
+  digitalai:
+    url: "https://digitalai.company.internal"
+    trigger_path: "/api/v1/releases/trigger"
+    status_path: "/api/v1/releases/executions"
+
+database:
+  host: "localhost"
+  port: 5432
+  name: "gateway_db"
+  user: "gateway_user"
+  password: "gateway_password"
+  pool_size: 10
+  max_overflow: 20
+  pool_timeout: 30
+  pool_recycle: 1800
+  table_creations: true
+
+housekeeping:
+  enabled: true
+  retention_days: 30
+  max_log_size_mb: 50
+  max_disk_usage_percent: 85
+  auto_rotate_logs: true
+  purge_db: false
