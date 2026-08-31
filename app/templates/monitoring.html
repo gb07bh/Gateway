@@ -1,0 +1,52 @@
+{% extends "base.html" %}
+
+{% block title %}Service Monitoring - Digital.ai Release Gateway{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>🟢 Service Telemetry & Node Health</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Real-time telemetry status for Gateway-DAI nodes and downstream services. 5-second pulse events are logged to <code>logs/heartbeat.log</code>.
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-top: 1.5rem;">
+        <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Gateway Status</div>
+            <div id="mon-gateway-status" style="font-size: 1.5rem; font-weight: 700; color: var(--success); margin-top: 0.25rem;">UP</div>
+        </div>
+        <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Active Node ID</div>
+            <div id="mon-node-id" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.25rem;">gateway-node-01</div>
+        </div>
+        <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Downstream Adapter</div>
+            <div id="mon-adapter-status" style="font-size: 1.2rem; font-weight: 600; color: var(--success); margin-top: 0.25rem;">HEALTHY</div>
+        </div>
+        <div style="background: #f1f5f9; padding: 1rem; border-radius: 8px; border: 1px solid var(--border);">
+            <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; font-weight: 600;">Database Connectivity</div>
+            <div id="mon-db-status" style="font-size: 1.2rem; font-weight: 600; color: var(--success); margin-top: 0.25rem;">HEALTHY</div>
+        </div>
+    </div>
+</div>
+
+<script>
+    async function updateMonitoring() {
+        try {
+            const res = await fetch("/api/v1/heartbeat", { cache: "no-store" });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById("mon-gateway-status").innerText = data.status;
+                document.getElementById("mon-node-id").innerText = data.node_id;
+                document.getElementById("mon-adapter-status").innerText = data.adapter_status;
+                document.getElementById("mon-db-status").innerText = data.database_status;
+            }
+        } catch (err) {
+            console.error("Failed to fetch heartbeat monitoring", err);
+        }
+    }
+
+    updateMonitoring();
+    setInterval(updateMonitoring, 5000);
+</script>
+{% endblock %}
+

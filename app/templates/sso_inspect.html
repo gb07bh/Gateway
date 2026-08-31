@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+
+{% block title %}SSO Header & Entitlement Inspection - Digital.ai Release Gateway{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>🔑 SSO Header & Entitlement Inspection Console</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Inspects incoming HTTP headers (e.g. <code>X-Remote-User</code>, <code>X-Remote-Groups</code>) and normalized project execution permissions.
+    </p>
+
+    <div style="display: flex; gap: 1rem; margin-top: 1rem;">
+        <button class="btn" onclick="fetchLiveSSOInspect()">🔄 Refresh Current Identity</button>
+    </div>
+</div>
+
+<div class="card">
+    <h2>👤 Extracted Human Identity & Entitlements</h2>
+    <table>
+        <tbody>
+            <tr>
+                <td style="width: 250px; font-weight: 600;">Username</td>
+                <td id="sso-username"><code>Loading...</code></td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Display Name</td>
+                <td id="sso-display-name">Loading...</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Admin Entitlement</td>
+                <td id="sso-admin-status"><span class="tag tag-aps">ADMIN</span></td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Dev Fallback Applied</td>
+                <td id="sso-dev-fallback">False</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>📂 Parsed Project Entitlements</h2>
+    <table>
+        <thead>
+            <tr>
+                <th>Project Name</th>
+                <th>Assigned Roles</th>
+                <th>Execution Right</th>
+            </tr>
+        </thead>
+        <tbody id="sso-projects-body">
+            <tr>
+                <td colspan="3" style="text-align: center; color: var(--text-muted);">Loading entitlements...</td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<div class="card">
+    <h2>🧪 Entitlement Simulator Workbench</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Simulate custom header inputs or group memberships to test role resolution without altering LDAP settings.
+    </p>
+    <form id="sso-sim-form" onsubmit="runSSOSimulation(event)">
+        <div class="form-group">
+            <label for="sim-header-user">Simulated User Header (X-Remote-User):</label>
+            <input type="text" id="sim-header-user" value="john_doe" required>
+        </div>
+        <div class="form-group">
+            <label for="sim-header-groups">Simulated Groups Header (X-Remote-Groups):</label>
+            <input type="text" id="sim-header-groups" value="DAI_ProjectA_DEV, DAI_ProjectA_APS, DAI_ProjectB_AUDIT, DAI_ADMIN" required>
+        </div>
+        <button type="submit" class="btn">🚀 Run Simulation</button>
+    </form>
+    <div id="sim-result-box" style="display: none; margin-top: 1.5rem; background: #0f172a; color: #38bdf8; padding: 1rem; border-radius: 6px; font-family: monospace; white-space: pre-wrap; font-size: 0.85rem;"></div>
+</div>
+
+<script>
+    async function fetchLiveSSOInspect() {
+        try {
+            const res = await fetch("/api/v1/sso/inspect", { cache: "no-store" });
+            if (res.ok) {
+                const data = await res.json();
+                document.getElementById("sso-username").innerHTML = `<code>${data.username}</code>`;
+                document.getElementById("sso-display-name").innerText = data.display_name;
+                document.getElementById("sso-dev-fallback").innerText = data.is_dev_fallback ? "Yes (Dev Mode)" : "No (SSO Header)";
+
+                const projectsBody = document.getElementById("sso-projects-body");
+                projectsBody.innerHTML = "";
+                if (data.projects && Object.keys(data.projects).length > 0) {
+                    for (const [proj, roles] of Object.entries(data.projects)) {
+                        const tr = document.createElement("tr");
+                        const rolesHtml = roles.map(r => `<span class="tag tag-${r.toLowerCase()}">${r}</span>`).join(" ");
+                        const canExecute = roles.some(r => ["DEV", "APS"].includes(r));
+                        const statusHtml = canExecute ? '<span style="color: var(--success); font-weight: 600;">✅ Authorized</span>' : '<span style="color: var(--danger); font-weight: 600;">🔒 Read-Only</span>';
+                        tr.innerHTML = `<td><strong>${proj}</strong></td><td>${rolesHtml}</td><td>${statusHtml}</td>`;
+                        projectsBody.appendChild(tr);
+                    }
+                } else {
+                    projectsBody.innerHTML = '<tr><td colspan="3" style="text-align: center; color: var(--text-muted);">No project mappings resolved</td></tr>';
+                }
+            }
+        } catch (err) {
+            console.error("Failed to inspect SSO identity", err);
+        }
+    }
+
+    async function runSSOSimulation(e) {
+        e.preventDefault();
+        const userVal = document.getElementById("sim-header-user").value;
+        const groupsVal = document.getElementById("sim-header-groups").value;
+
+        const payload = {
+            headers: {
+                "X-Remote-User": userVal,
+                "X-Remote-Groups": groupsVal
+            }
+        };
+
+        try {
+            const res = await fetch("/api/v1/sso/inspect", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            const box = document.getElementById("sim-result-box");
+            box.style.display = "block";
+            box.innerText = JSON.stringify(data, null, 2);
+        } catch (err) {
+            alert("Simulation failed: " + err);
+        }
+    }
+
+    fetchLiveSSOInspect();
+</script>
+{% endblock %}

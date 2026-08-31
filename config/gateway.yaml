@@ -7,9 +7,6 @@ server:
 
 logging:
   dir: "logs"
-  audit_file: "audit.log"
-  console_file: "console.log"
-  service_file: "service.log"
   level: "INFO"
 
 identity:
@@ -48,9 +45,9 @@ adapters:
 database:
   host: "localhost"
   port: 5432
-  name: "gateway_db"
-  user: "gateway_user"
-  password: "gateway_password"
+  name: "dai_gateway"
+  user: "postgres"
+  password: "postgres"
   pool_size: 10
   max_overflow: 20
   pool_timeout: 30

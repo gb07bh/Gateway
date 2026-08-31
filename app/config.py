@@ -18,13 +18,16 @@ class LoggingConfig(BaseModel):
     audit_file: str = "audit.log"
     console_file: str = "console.log"
     service_file: str = "service.log"
+    heartbeat_file: str = "heartbeat.log"
     level: str = "INFO"
+
 
 
 class IdentityConfig(BaseModel):
     header_user: str = "X-Remote-User"
     header_groups: str = "X-Remote-Groups"
     group_prefix: str = "DAI_"
+    admin_groups: list[str] = Field(default_factory=lambda: ["DAI_ADMIN", "GATEWAY_ADMIN", "ADMIN"])
 
 
 class AuthConfig(BaseModel):

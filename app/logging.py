@@ -97,6 +97,8 @@ class GatewayLoggers:
         self.identity_logger = self.get_logger("identity", log_type="identity")
         self.adapter_logger = self.get_logger("adapter", log_type="adapter")
         self.housekeeping_logger = self.get_logger("housekeeping", log_type="housekeeping")
+        self.heartbeat_logger = self.get_logger("heartbeat", log_type="heartbeat")
+
 
         # Route SQLAlchemy DB queries (DDL create_tables, DML insert/update/select) into database.log and service.log when level is DEBUG
         if self.is_debug:

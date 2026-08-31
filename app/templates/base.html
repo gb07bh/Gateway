@@ -14,6 +14,7 @@
             --text-muted: #64748b;
             --border: #e2e8f0;
             --success: #16a34a;
+            --warning: #d97706;
             --danger: #dc2626;
         }
         body {
@@ -34,13 +35,73 @@
         header h1 {
             font-size: 1.25rem;
             margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+        .nav-bar {
+            background-color: #1e293b;
+            padding: 0.5rem 2rem;
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+            border-bottom: 1px solid #334155;
+        }
+        .nav-bar a {
+            color: #cbd5e1;
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 0.3rem 0.6rem;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+        .nav-bar a:hover {
+            color: #ffffff;
+            background-color: #334155;
+        }
+        .nav-bar a.admin-badge {
+            background-color: #312e81;
+            color: #a5b4fc;
+            border: 1px solid #4338ca;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
         }
         .user-badge {
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             background: #1e293b;
             padding: 0.4rem 0.8rem;
             border-radius: 6px;
             border: 1px solid #334155;
+        }
+        .health-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.4rem;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 0.3rem 0.75rem;
+            border-radius: 9999px;
+            background-color: #064e3b;
+            color: #6ee7b7;
+            border: 1px solid #047857;
+            transition: all 0.3s ease;
+        }
+        .health-pill.status-green { background-color: #064e3b; color: #6ee7b7; border-color: #047857; }
+        .health-pill.status-yellow { background-color: #78350f; color: #fde68a; border-color: #b45309; }
+        .health-pill.status-red { background-color: #7f1d1d; color: #fca5a5; border-color: #b91c1c; }
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            background-color: currentColor;
         }
         container {
             display: block;
@@ -127,15 +188,79 @@
 </head>
 <body>
     <header>
-        <h1>Release Gateway</h1>
-        {% if user %}
-        <div class="user-badge">
-            Authenticated: <strong>{{ user.username }}</strong> ({{ user.display_name }})
+        <h1>🚀 Release Gateway</h1>
+        <div class="header-right">
+            <div id="heartbeat-pill" class="health-pill status-green">
+                <span class="status-dot"></span>
+                <span id="heartbeat-text">Service Alive (5s)</span>
+            </div>
+            {% if user %}
+            <div class="user-badge">
+                User: <strong>{{ user.username }}</strong> ({{ user.display_name }})
+            </div>
+            {% endif %}
         </div>
-        {% endif %}
     </header>
+
+    <div class="nav-bar">
+        <a href="/dashboard">📊 Dashboard</a>
+        {% if user and user.is_admin %}
+        <a href="/monitoring">🟢 Service Monitoring</a>
+        <a href="/sso-inspect">🔑 SSO & Entitlements</a>
+        <a href="/docs">📄 API & Swagger</a>
+        <span class="admin-badge">Admin Entitled</span>
+        {% endif %}
+    </div>
+
     <container>
         {% block content %}{% endblock %}
     </container>
+
+    <script>
+        let lastHeartbeatSuccess = Date.now();
+        let missedCount = 0;
+
+        async function pulseHeartbeat() {
+            const pill = document.getElementById("heartbeat-pill");
+            const text = document.getElementById("heartbeat-text");
+            try {
+                const res = await fetch("/api/v1/heartbeat", { cache: "no-store" });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.status === "UP") {
+                        missedCount = 0;
+                        lastHeartbeatSuccess = Date.now();
+                        pill.className = "health-pill status-green";
+                        text.innerText = "Service Alive (5s)";
+                    } else {
+                        pill.className = "health-pill status-yellow";
+                        text.innerText = "Degraded Service";
+                    }
+                } else {
+                    handleHeartbeatFailure();
+                }
+            } catch (err) {
+                handleHeartbeatFailure();
+            }
+        }
+
+        function handleHeartbeatFailure() {
+            missedCount++;
+            const pill = document.getElementById("heartbeat-pill");
+            const text = document.getElementById("heartbeat-text");
+            if (missedCount === 1) {
+                pill.className = "health-pill status-yellow";
+                text.innerText = "Heartbeat Missed";
+            } else {
+                pill.className = "health-pill status-red";
+                text.innerText = "Service Down";
+            }
+        }
+
+        // Pulse heartbeat every 5 seconds
+        pulseHeartbeat();
+        setInterval(pulseHeartbeat, 5000);
+    </script>
 </body>
 </html>
+

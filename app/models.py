@@ -15,6 +15,7 @@ class UserIdentity:
     display_name: str
     raw_groups: List[str]
     projects: Dict[str, List[str]] = field(default_factory=dict)  # {"ProjectA": ["DEV", "APS"]}
+    is_admin: bool = False
 
     def has_role(self, project_name: str, role_name: str) -> bool:
         """Returns True if the user holds the specified role in project_name."""

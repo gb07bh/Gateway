@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}API Documentation & Request Lookup - Digital.ai Release Gateway{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>🔍 Request Lookup by Request ID</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Look up correlation details, execution parameters, and status of any release request by its Request ID.
+    </p>
+    <form id="req-lookup-form" onsubmit="lookupRequest(event)">
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="req-id-input" placeholder="e.g. req-12345678 or exec-mock-001" required style="flex: 1;">
+            <button type="submit" class="btn">Search Request</button>
+        </div>
+    </form>
+    <div id="req-result-box" style="display: none; margin-top: 1rem; background: #f8fafc; border: 1px solid var(--border); padding: 1rem; border-radius: 6px;">
+        <h3 style="margin-top: 0; font-size: 1rem;">Result:</h3>
+        <pre id="req-result-json" style="background: #0f172a; color: #38bdf8; padding: 1rem; border-radius: 6px; overflow-x: auto; font-size: 0.85rem;"></pre>
+    </div>
+</div>
+
+<div class="card">
+    <h2>📄 OpenAPI 3.0 API Specification</h2>
+    <p style="color: var(--text-muted); font-size: 0.9rem;">
+        Interactive REST API schema served dynamically from <code>/api/v1/openapi.json</code>.
+    </p>
+    <div style="margin-bottom: 1rem;">
+        <a href="/api/v1/openapi.json" target="_blank" class="btn" style="text-decoration: none; display: inline-block;">📥 Download OpenAPI JSON Schema</a>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>Method</th>
+                <th>Endpoint Path</th>
+                <th>Description</th>
+                <th>Action</th>
+            </tr>
+        </thead>
+        <tbody id="swagger-routes-body">
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/api/v1/user</code></td>
+                <td>Returns authenticated user identity & project roles</td>
+                <td><a href="/api/v1/user" target="_blank" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Test</a></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-aps">POST</span></td>
+                <td><code>/api/v1/execute</code></td>
+                <td>Triggers release execution with server-side authorization</td>
+                <td><span style="font-size: 0.8rem; color: var(--text-muted);">POST Payload</span></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/api/v1/execution/{execution_id}</code></td>
+                <td>Retrieve release execution status by execution ID</td>
+                <td><span style="font-size: 0.8rem; color: var(--text-muted);">Parameter Required</span></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/api/v1/requests/{request_id}</code></td>
+                <td>Retrieve request details by Correlation Request ID</td>
+                <td><span style="font-size: 0.8rem; color: var(--text-muted);">Parameter Required</span></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/api/v1/heartbeat</code></td>
+                <td>5-second periodic heartbeat monitoring metrics</td>
+                <td><a href="/api/v1/heartbeat" target="_blank" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Test</a></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/health</code></td>
+                <td>Gateway basic health endpoint</td>
+                <td><a href="/health" target="_blank" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Test</a></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/ready</code></td>
+                <td>Readiness check evaluating database & adapter health</td>
+                <td><a href="/ready" target="_blank" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Test</a></td>
+            </tr>
+            <tr>
+                <td><span class="tag tag-dev">GET</span></td>
+                <td><code>/api/v1/sso/inspect</code></td>
+                <td>SSO identity and header inspection report</td>
+                <td><a href="/api/v1/sso/inspect" target="_blank" class="btn" style="padding: 0.2rem 0.5rem; font-size: 0.8rem;">Test</a></td>
+            </tr>
+        </tbody>
+    </table>
+</div>
+
+<script>
+    async function lookupRequest(e) {
+        e.preventDefault();
+        const reqId = document.getElementById("req-id-input").value.trim();
+        const box = document.getElementById("req-result-box");
+        const jsonPre = document.getElementById("req-result-json");
+
+        try {
+            const res = await fetch(`/api/v1/requests/${encodeURIComponent(reqId)}`);
+            const data = await res.json();
+            box.style.display = "block";
+            jsonPre.innerText = JSON.stringify(data, null, 2);
+        } catch (err) {
+            box.style.display = "block";
+            jsonPre.innerText = "Error looking up request: " + err;
+        }
+    }
+</script>
+{% endblock %}

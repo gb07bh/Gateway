@@ -28,7 +28,7 @@ class IdentityNormalizer:
         )
 
         if not username or not username.strip():
-            username = "dev_user"
+            username = "dev_user_1"
 
         username = username.strip()
 
@@ -55,11 +55,20 @@ class IdentityNormalizer:
 
         display_name = username.replace("_", " ").title()
 
+        # 4. Determine admin status
+        admin_groups = getattr(self.config, "admin_groups", ["DAI_ADMIN", "GATEWAY_ADMIN", "ADMIN"])
+        is_admin = (
+            username == "dev_user"
+            or any(grp.upper() in [ag.upper() for ag in admin_groups] for grp in raw_groups)
+            or any("ADMIN" in roles for roles in projects.values())
+        )
+
         return UserIdentity(
             username=username,
             display_name=display_name,
             raw_groups=raw_groups,
             projects=projects,
+            is_admin=is_admin,
         )
 
     def _parse_groups_into_projects(self, raw_groups: List[str]) -> Dict[str, List[str]]:

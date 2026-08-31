@@ -64,8 +64,9 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     # 4. Global identity extraction middleware
     @app.before_request
     def extract_identity_middleware():
-        if request.endpoint and "health" in request.endpoint:
+        if request.endpoint and any(ep in request.endpoint for ep in ["health", "heartbeat", "ready"]):
             return
+
 
         user_identity = identity_normalizer.extract_identity(request)
         g.user_identity = user_identity
