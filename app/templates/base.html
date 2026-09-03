@@ -73,6 +73,117 @@
             align-items: center;
             gap: 1rem;
         }
+        .profile-dropdown-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        .profile-btn {
+            background-color: #1e293b;
+            color: #ffffff;
+            border: 1px solid #334155;
+            padding: 0.4rem 0.85rem;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            transition: all 0.2s ease;
+        }
+        .profile-btn:hover {
+            background-color: #334155;
+            border-color: #475569;
+        }
+        .profile-avatar {
+            font-size: 1rem;
+        }
+        .profile-name {
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .profile-admin-tag {
+            background-color: #166534;
+            color: #dcfce7;
+            font-size: 0.7rem;
+            font-weight: 700;
+            padding: 0.15rem 0.45rem;
+            border-radius: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.03em;
+        }
+        .profile-caret {
+            font-size: 0.65rem;
+            color: #94a3b8;
+            margin-left: 0.2rem;
+            transition: transform 0.2s ease;
+        }
+        .profile-dropdown-menu {
+            position: absolute;
+            right: 0;
+            top: calc(100% + 8px);
+            width: 380px;
+            background: #ffffff;
+            color: #1e293b;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25), 0 8px 10px -6px rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--border);
+            z-index: 1000;
+            text-align: left;
+        }
+        .profile-card-header {
+            background: #f8fafc;
+            padding: 1rem 1.25rem;
+            border-bottom: 1px solid var(--border);
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+        }
+        .profile-card-title {
+            font-size: 1.05rem;
+            color: #0f172a;
+            display: flex;
+            align-items: center;
+        }
+        .profile-card-subtitle {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 0.25rem;
+            word-break: break-all;
+        }
+        .profile-card-body {
+            padding: 0.85rem 1.25rem;
+            max-height: 460px;
+            overflow-y: auto;
+        }
+        .profile-info-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.45rem 0;
+            border-bottom: 1px solid #f1f5f9;
+            font-size: 0.85rem;
+        }
+        .profile-info-label {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+        .profile-info-value {
+            color: #0f172a;
+            text-align: right;
+            word-break: break-all;
+            padding-left: 0.5rem;
+        }
+        .profile-groups-container {
+            margin-top: 0.85rem;
+            padding-top: 0.6rem;
+            border-top: 1px solid var(--border);
+        }
+        .profile-groups-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.3rem;
+            max-height: 120px;
+            overflow-y: auto;
+        }
         .user-badge {
             font-size: 0.85rem;
             background: #1e293b;
@@ -195,8 +306,72 @@
                 <span id="heartbeat-text">Service Alive (5s)</span>
             </div>
             {% if user %}
-            <div class="user-badge">
-                User: <strong>{{ user.username }}</strong> ({{ user.display_name }})
+            <div class="profile-dropdown-wrapper">
+                <button id="profile-btn" class="profile-btn" onclick="toggleProfileMenu(event)" aria-haspopup="true" aria-expanded="false" title="Click to view authenticated user profile">
+                    <span class="profile-avatar">👤</span>
+                    <span class="profile-name">{{ user.display_name }}</span>
+                    {% if user.is_admin %}
+                    <span class="profile-admin-tag">ADMIN</span>
+                    {% endif %}
+                    <span class="profile-caret">▼</span>
+                </button>
+                <div id="profile-dropdown-menu" class="profile-dropdown-menu" style="display: none;">
+                    <div class="profile-card-header">
+                        <div class="profile-card-title">
+                            <strong>{{ user.display_name }}</strong>
+                            {% if user.is_admin %}
+                            <span class="profile-admin-tag" style="margin-left: 0.5rem;">ADMIN</span>
+                            {% endif %}
+                        </div>
+                        <div class="profile-card-subtitle">{{ user.email or user.username }}</div>
+                    </div>
+                    <div class="profile-card-body">
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">Full Name</span>
+                            <span class="profile-info-value"><strong>{{ user.full_name }}</strong></span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">Display Name</span>
+                            <span class="profile-info-value">{{ user.display_name }}</span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">First Name</span>
+                            <span class="profile-info-value">{{ user.first_name or 'N/A' }}</span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">Last Name</span>
+                            <span class="profile-info-value">{{ user.last_name or 'N/A' }}</span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">UID</span>
+                            <span class="profile-info-value"><code>{{ user.uid }}</code></span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">Username</span>
+                            <span class="profile-info-value"><code>{{ user.username }}</code></span>
+                        </div>
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">Email</span>
+                            <span class="profile-info-value">{{ user.email or 'N/A' }}</span>
+                        </div>
+                        {% if user.is_admin %}
+                        <div class="profile-info-row">
+                            <span class="profile-info-label">Admin Status</span>
+                            <span class="profile-info-value"><span class="tag tag-aps">ADMIN</span></span>
+                        </div>
+                        {% endif %}
+                        <div class="profile-groups-container">
+                            <div class="profile-info-label" style="margin-bottom: 0.4rem;">Raw SSO / LDAP Groups</div>
+                            <div class="profile-groups-list">
+                                {% for grp in user.raw_groups %}
+                                    <span class="tag" style="margin-bottom: 0.25rem;">{{ grp }}</span>
+                                {% else %}
+                                    <em style="color: var(--text-muted); font-size: 0.8rem;">No raw LDAP groups in headers</em>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
             {% endif %}
         </div>
@@ -260,6 +435,37 @@
         // Pulse heartbeat every 5 seconds
         pulseHeartbeat();
         setInterval(pulseHeartbeat, 5000);
+
+        function toggleProfileMenu(e) {
+            if (e) e.stopPropagation();
+            const menu = document.getElementById("profile-dropdown-menu");
+            const btn = document.getElementById("profile-btn");
+            if (!menu) return;
+            const isOpen = menu.style.display === "block";
+            menu.style.display = isOpen ? "none" : "block";
+            if (btn) btn.setAttribute("aria-expanded", !isOpen);
+        }
+
+        document.addEventListener("click", function(event) {
+            const wrapper = document.querySelector(".profile-dropdown-wrapper");
+            const menu = document.getElementById("profile-dropdown-menu");
+            if (wrapper && menu && !wrapper.contains(event.target)) {
+                menu.style.display = "none";
+                const btn = document.getElementById("profile-btn");
+                if (btn) btn.setAttribute("aria-expanded", "false");
+            }
+        });
+
+        document.addEventListener("keydown", function(event) {
+            if (event.key === "Escape") {
+                const menu = document.getElementById("profile-dropdown-menu");
+                if (menu && menu.style.display === "block") {
+                    menu.style.display = "none";
+                    const btn = document.getElementById("profile-btn");
+                    if (btn) btn.setAttribute("aria-expanded", "false");
+                }
+            }
+        });
     </script>
 </body>
 </html>

@@ -19,14 +19,34 @@
     <table>
         <tbody>
             <tr>
-                <td style="width: 250px; font-weight: 600;">Username</td>
+                <td style="width: 250px; font-weight: 600;">UID</td>
+                <td id="sso-uid"><code>Loading...</code></td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Username</td>
                 <td id="sso-username"><code>Loading...</code></td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">First Name</td>
+                <td id="sso-firstname">Loading...</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Last Name</td>
+                <td id="sso-lastname">Loading...</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Email</td>
+                <td id="sso-email">Loading...</td>
+            </tr>
+            <tr>
+                <td style="font-weight: 600;">Full Name</td>
+                <td id="sso-full-name">Loading...</td>
             </tr>
             <tr>
                 <td style="font-weight: 600;">Display Name</td>
                 <td id="sso-display-name">Loading...</td>
             </tr>
-            <tr>
+            <tr id="sso-admin-row" style="display: none;">
                 <td style="font-weight: 600;">Admin Entitlement</td>
                 <td id="sso-admin-status"><span class="tag tag-aps">ADMIN</span></td>
             </tr>
@@ -59,12 +79,26 @@
 <div class="card">
     <h2>🧪 Entitlement Simulator Workbench</h2>
     <p style="color: var(--text-muted); font-size: 0.9rem;">
-        Simulate custom header inputs or group memberships to test role resolution without altering LDAP settings.
+        Simulate custom header inputs or group memberships to test multi-header identity and role resolution without altering LDAP settings.
     </p>
     <form id="sso-sim-form" onsubmit="runSSOSimulation(event)">
-        <div class="form-group">
-            <label for="sim-header-user">Simulated User Header (X-Remote-User):</label>
-            <input type="text" id="sim-header-user" value="john_doe" required>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label for="sim-header-uid">Simulated UID Header (Uid / X-Remote-User):</label>
+                <input type="text" id="sim-header-uid" value="johndoe123" required>
+            </div>
+            <div class="form-group">
+                <label for="sim-header-email">Simulated Email Header (email / X-Email):</label>
+                <input type="email" id="sim-header-email" value="john.doe@example.com">
+            </div>
+            <div class="form-group">
+                <label for="sim-header-firstname">Simulated First Name Header (firstName / X-First-Name):</label>
+                <input type="text" id="sim-header-firstname" value="John">
+            </div>
+            <div class="form-group">
+                <label for="sim-header-lastname">Simulated Last Name Header (Lastname / X-Last-Name):</label>
+                <input type="text" id="sim-header-lastname" value="Doe">
+            </div>
         </div>
         <div class="form-group">
             <label for="sim-header-groups">Simulated Groups Header (X-Remote-Groups):</label>
@@ -81,9 +115,19 @@
             const res = await fetch("/api/v1/sso/inspect", { cache: "no-store" });
             if (res.ok) {
                 const data = await res.json();
+                document.getElementById("sso-uid").innerHTML = `<code>${data.uid || data.username}</code>`;
                 document.getElementById("sso-username").innerHTML = `<code>${data.username}</code>`;
+                document.getElementById("sso-firstname").innerText = data.first_name || "N/A";
+                document.getElementById("sso-lastname").innerText = data.last_name || "N/A";
+                document.getElementById("sso-email").innerText = data.email || "N/A";
+                document.getElementById("sso-full-name").innerText = data.full_name || data.display_name;
                 document.getElementById("sso-display-name").innerText = data.display_name;
                 document.getElementById("sso-dev-fallback").innerText = data.is_dev_fallback ? "Yes (Dev Mode)" : "No (SSO Header)";
+
+                const adminRow = document.getElementById("sso-admin-row");
+                if (adminRow) {
+                    adminRow.style.display = data.is_admin ? "" : "none";
+                }
 
                 const projectsBody = document.getElementById("sso-projects-body");
                 projectsBody.innerHTML = "";
@@ -107,12 +151,19 @@
 
     async function runSSOSimulation(e) {
         e.preventDefault();
-        const userVal = document.getElementById("sim-header-user").value;
+        const uidVal = document.getElementById("sim-header-uid").value;
+        const firstNameVal = document.getElementById("sim-header-firstname").value;
+        const lastNameVal = document.getElementById("sim-header-lastname").value;
+        const emailVal = document.getElementById("sim-header-email").value;
         const groupsVal = document.getElementById("sim-header-groups").value;
 
         const payload = {
             headers: {
-                "X-Remote-User": userVal,
+                "Uid": uidVal,
+                "firstName": firstNameVal,
+                "Lastname": lastNameVal,
+                "email": emailVal,
+                "X-Remote-User": uidVal,
                 "X-Remote-Groups": groupsVal
             }
         };

@@ -4,20 +4,6 @@
 
 {% block content %}
 <div class="card">
-    <h2>User Authenticated Details (SSO Normalization)</h2>
-    <p><strong>Username (UID):</strong> {{ user.username }}</p>
-    <p><strong>Display Name:</strong> {{ user.display_name }}</p>
-    <p><strong>Raw SSO/LDAP Groups:</strong></p>
-    <div>
-        {% for grp in user.raw_groups %}
-            <span class="tag">{{ grp }}</span>
-        {% else %}
-            <em>No raw LDAP groups passed in headers.</em>
-        {% endfor %}
-    </div>
-</div>
-
-<div class="card">
     <h2>Project & Role Memberships</h2>
     <table>
         <thead>

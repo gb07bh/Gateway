@@ -55,6 +55,9 @@ identity:
   # [IMPORTANCE: CRITICAL] HTTP header containing the authenticated user's ID/username.
   # Set by Apache HTTPD / SSO reverse proxy after authentication (e.g. "X-Remote-User").
   header_user: "X-Remote-User"
+  header_first_name: "X-First-Name"
+  header_last_name: "X-Last-Name"
+  header_email: "X-Email"
 
   # [IMPORTANCE: CRITICAL] HTTP header containing comma-separated LDAP user groups.
   # Used to derive user's accessible projects and execution roles (e.g. "X-Remote-Groups").

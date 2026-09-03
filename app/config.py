@@ -25,6 +25,9 @@ class LoggingConfig(BaseModel):
 
 class IdentityConfig(BaseModel):
     header_user: str = "X-Remote-User"
+    header_first_name: str = "X-First-Name"
+    header_last_name: str = "X-Last-Name"
+    header_email: str = "X-Email"
     header_groups: str = "X-Remote-Groups"
     group_prefix: str = "DAI_"
     admin_groups: list[str] = Field(default_factory=lambda: ["DAI_ADMIN", "GATEWAY_ADMIN", "ADMIN"])

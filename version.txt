@@ -1,3 +1,11 @@
+1.7.0
+- Multi-header SSO identity capturing for segregated user headers (`Uid`, `firstName`, `Lastname`, `email`)
+- Configurable header mapping properties (`header_user`, `header_first_name`, `header_last_name`, `header_email`) in `IdentityConfig` and `gateway.yaml` with automatic alias fallback resolution
+- Interactive user profile flyout section on top-right header displaying full name, display name, first/last names, UID, username, email, and LDAP groups
+- Dynamic Full Name (`firstName + Lastname`) synthesis and display name formatting
+- Non-admin status protection (suppressing admin tags, statuses, and entitlements for non-administrator users across UI and reports)
+- Updated Entitlement Simulator Workbench supporting multi-header simulation and inspection
+
 1.6.0
 - Entitlement-gated Admin Navigation Bar for admin group members (`DAI_ADMIN`, `GATEWAY_ADMIN`)
 - Real-time 5-second Heartbeat Service Monitoring with dedicated structured `logs/heartbeat.log` logging stream

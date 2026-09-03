@@ -16,6 +16,22 @@ class UserIdentity:
     raw_groups: List[str]
     projects: Dict[str, List[str]] = field(default_factory=dict)  # {"ProjectA": ["DEV", "APS"]}
     is_admin: bool = False
+    uid: str = ""
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    email: Optional[str] = None
+
+    def __post_init__(self):
+        if not self.uid:
+            self.uid = self.username
+
+    @property
+    def full_name(self) -> str:
+        if self.first_name and self.last_name:
+            return f"{self.first_name} {self.last_name}".strip()
+        if self.first_name:
+            return self.first_name
+        return self.display_name or self.username
 
     def has_role(self, project_name: str, role_name: str) -> bool:
         """Returns True if the user holds the specified role in project_name."""
