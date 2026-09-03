@@ -52,6 +52,11 @@ logging:
 # 3. SSO & IDENTITY CONFIGURATION
 # ------------------------------------------------------------------------------
 identity:
+  # [IMPORTANCE: CRITICAL] Identity resolution source strategy.
+  # - "ldap": Authenticates UID from SSO header, resolves entitlements from PostgreSQL / LDAP worker.
+  # - "mock": Offline / test mode using request headers and dev fallbacks without contacting LDAP.
+  source: "ldap"
+
   # [IMPORTANCE: CRITICAL] HTTP header containing the authenticated user's ID/username.
   # Set by Apache HTTPD / SSO reverse proxy after authentication (e.g. "X-Remote-User").
   header_user: "X-Remote-User"
@@ -59,12 +64,13 @@ identity:
   header_last_name: "X-Last-Name"
   header_email: "X-Email"
 
-  # [IMPORTANCE: CRITICAL] HTTP header containing comma-separated LDAP user groups.
-  # Used to derive user's accessible projects and execution roles (e.g. "X-Remote-Groups").
+  # [IMPORTANCE: HIGH] Path to dedicated LDAP synchronization configuration file.
+  ldap_config_path: "config/ldap.yaml"
+
+  # [IMPORTANCE: MEDIUM] HTTP header containing comma-separated LDAP user groups (used in mock/header mode).
   header_groups: "X-Remote-Groups"
 
-  # [IMPORTANCE: CRITICAL] Group name prefix used to parse project name and role.
-  # Expected format: <prefix><PROJECT_NAME>_<ROLE> (e.g., "DAI_ProjectA_DEV").
+  # [IMPORTANCE: MEDIUM] Group name prefix used to parse project name and role (used in mock/header mode).
   group_prefix: "DAI_"
 
 # ------------------------------------------------------------------------------

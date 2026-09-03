@@ -1,0 +1,123 @@
+﻿# ==============================================================================
+# DIGITAL.AI RELEASE GATEWAY - LDAP SYNCHRONIZATION CONFIGURATION
+# ==============================================================================
+# This sample YAML file documents all available configuration fields used by the
+# independent LDAP synchronization engine. Inline comments explain the purpose,
+# impact, defaults, and requirements of each setting.
+# ==============================================================================
+
+ldap:
+  # [IMPORTANCE: CRITICAL] Master toggle for LDAP integration.
+  # If false, Gateway will not initialize the LDAP sync engine or scheduled worker.
+  enabled: true
+
+  # [IMPORTANCE: CRITICAL] Secure LDAP connection URI.
+  # Standard enterprise LDAPS runs over TLS on port 636: "ldaps://<hostname>:636"
+  # Standard LDAP over StartTLS uses port 389: "ldap://<hostname>:389"
+  server_uri: "ldaps://ad.company.internal:636"
+
+  # [IMPORTANCE: CRITICAL] Base Distinguished Name (DN) of the directory.
+  # Serves as the root boundary for all directory search operations.
+  base_dn: "DC=company,DC=internal"
+
+  # [IMPORTANCE: HIGH] Organizational Unit (OU) path where human users are located.
+  # Scope this to restrict user searches and optimize query latency.
+  user_search_base: "OU=Users,DC=company,DC=internal"
+
+  # [IMPORTANCE: HIGH] Organizational Unit (OU) path where Gateway groups are stored.
+  # Scope this to avoid traversing unrelated distribution lists and security groups.
+  group_search_base: "OU=Groups,DC=company,DC=internal"
+
+  # ----------------------------------------------------------------------------
+  # GROUP & ROLE EXTRACTION CONFIGURATION
+  # ----------------------------------------------------------------------------
+  # [IMPORTANCE: CRITICAL] Group name prefix parsed by Gateway into Project and Role.
+  # Expected naming convention: <group_prefix><ProjectName>_<Role>
+  # Example: "DAI_ProjectA_DEV" -> Project: "ProjectA", Role: "DEV"
+  # Example: "DAI_ProjectB_APS" -> Project: "ProjectB", Role: "APS"
+  group_prefix: "DAI_"
+
+  # [IMPORTANCE: HIGH] LDAP attribute holding the group name / CN.
+  # - "cn": Standard Active Directory and OpenLDAP group naming attribute.
+  # - "name" or "sAMAccountName": Alternative Windows AD group identifiers.
+  group_cn_attr: "cn"
+
+  # [IMPORTANCE: HIGH] LDAP attribute on the group object holding member DNs.
+  # - "member": Standard Active Directory (stores full user DNs).
+  # - "uniqueMember": OpenLDAP / Directory Server groupOfUniqueNames.
+  # - "memberUid": POSIX accounts (stores usernames).
+  group_member_attr: "member"
+
+  # [IMPORTANCE: HIGH] LDAP filter template for group discovery.
+  # Formatted with {group_cn_attr} and {group_prefix} at runtime.
+  # Filters out non-Gateway groups to keep the sync worker fast and lightweight.
+  group_filter_template: "(&(objectClass=group)({group_cn_attr}={group_prefix}*))"
+
+  # ----------------------------------------------------------------------------
+  # USER ATTRIBUTE MAPPINGS
+  # ----------------------------------------------------------------------------
+  # [IMPORTANCE: CRITICAL] LDAP attribute representing the user's primary login ID (UID).
+  # Must match the UID header forwarded by SSO / Apache (e.g. X-Remote-User).
+  # - "sAMAccountName": Active Directory standard user logon name.
+  # - "uid": Standard OpenLDAP / Linux directory username.
+  user_uid_attr: "sAMAccountName"
+
+  # [IMPORTANCE: MEDIUM] LDAP attribute for user email address.
+  user_mail_attr: "mail"
+
+  # [IMPORTANCE: MEDIUM] LDAP attribute for user display / full name.
+  user_display_name_attr: "displayName"
+
+  # [IMPORTANCE: LOW] LDAP attribute for given / first name.
+  user_first_name_attr: "givenName"
+
+  # [IMPORTANCE: LOW] LDAP attribute for surname / last name.
+  user_last_name_attr: "sn"
+
+  # ----------------------------------------------------------------------------
+  # ACTIVE DIRECTORY ADVANCED OPTIONS
+  # ----------------------------------------------------------------------------
+  # [IMPORTANCE: MEDIUM] Enable server-side recursive evaluation for nested groups.
+  # When true, uses AD rule LDAP_MATCHING_RULE_IN_CHAIN (1.2.840.113556.1.4.1941)
+  # to expand groups that contain other groups. Defaults to false.
+  nested_groups_enabled: false
+
+  # [IMPORTANCE: CRITICAL] Secret key identifier for the LDAP bind service account.
+  # Secrets are NEVER stored in YAML. The Gateway uses CredentialResolver to fetch
+  # the password from getCred CLI (or CRED_GATEWAY_LDAP_BIND_ACCOUNT environment variable).
+  bind_cred_key: "gateway_ldap_bind_account"
+
+  # [IMPORTANCE: MEDIUM] Mock directory provider mode.
+  # Set to true for offline local testing, development, and CI/CD pipelines
+  # where a live Active Directory domain controller is not reachable.
+  mock_mode: false
+
+  # ----------------------------------------------------------------------------
+  # SYNCHRONIZATION SCHEDULE & WORKER SETTINGS
+  # ----------------------------------------------------------------------------
+  sync:
+    # [IMPORTANCE: HIGH] Periodic background sync interval (in minutes).
+    # Controls how frequently the background worker sweeps for directory updates.
+    interval_minutes: 15
+
+    # [IMPORTANCE: HIGH] LDAP search page size (RFC 2696).
+    # Active Directory rejects unpaged queries returning >1000 entries.
+    # Set between 250 and 500 to keep network buffers manageable.
+    page_size: 500
+
+    # [IMPORTANCE: MEDIUM] Socket connection and query timeout in seconds.
+    timeout_seconds: 10
+
+    # [IMPORTANCE: CRITICAL] Option A: Just-In-Time (JIT) fallback for unsynced users.
+    # If true, when an authenticated SSO user (UID) logs in for the first time
+    # and has not yet been processed by the scheduled worker, Gateway performs
+    # a fast single-user lookup to LDAP and provisions them immediately.
+    jit_fallback_enabled: true
+
+    # [IMPORTANCE: MEDIUM] Use Active Directory uSNChanged for delta syncs.
+    # When true, only objects modified since the previous sync run are retrieved.
+    incremental: false
+
+    # [IMPORTANCE: LOW] Remove users from Gateway database if deleted from LDAP.
+    # When false, users are marked inactive (is_active = false) to preserve audit trails.
+    prune_missing_users: false

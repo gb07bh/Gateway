@@ -317,6 +317,7 @@
                 </button>
                 <div id="profile-dropdown-menu" class="profile-dropdown-menu" style="display: none;">
                     <div class="profile-card-header">
+                        <div class="profile-card-section-title" style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.25rem;">User Authenticated Details</div>
                         <div class="profile-card-title">
                             <strong>{{ user.display_name }}</strong>
                             {% if user.is_admin %}
@@ -381,6 +382,7 @@
         <a href="/dashboard">📊 Dashboard</a>
         {% if user and user.is_admin %}
         <a href="/monitoring">🟢 Service Monitoring</a>
+        <a href="/admin/ldap">👥 LDAP Management</a>
         <a href="/sso-inspect">🔑 SSO & Entitlements</a>
         <a href="/docs">📄 API & Swagger</a>
         <span class="admin-badge">Admin Entitled</span>

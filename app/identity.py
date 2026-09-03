@@ -1,8 +1,11 @@
 import re
-from typing import Dict, List, Tuple, Optional
+import logging
+from typing import Dict, List, Tuple, Optional, Any
 from flask import Request, g
 from app.models import UserIdentity
 from app.config import IdentityConfig
+
+ldap_logger = logging.getLogger("gateway.ldap")
 
 
 class IdentityExtractionError(Exception):
@@ -13,9 +16,10 @@ class IdentityExtractionError(Exception):
 class IdentityNormalizer:
     """Extracts and normalizes SSO / Apache corporate identity into Gateway UserIdentity."""
 
-    def __init__(self, config: IdentityConfig):
+    def __init__(self, config: IdentityConfig, sync_manager: Optional[Any] = None):
         self.config = config
-        self.group_prefix = config.group_prefix.upper()  # e.g., "DAI_"
+        self.group_prefix = (getattr(config, "group_prefix", None) or "DAI_").upper()
+        self.sync_manager = sync_manager
 
     def _extract_header_with_fallbacks(
         self,
@@ -44,7 +48,7 @@ class IdentityNormalizer:
         return None
 
     def extract_identity(self, request: Request) -> UserIdentity:
-        """Parses user identity and group memberships from incoming HTTP request headers."""
+        """Parses user identity and group memberships from incoming HTTP request headers or LDAP DB."""
 
         # 1. Extract username / UID
         username = self._extract_header_with_fallbacks(
@@ -55,7 +59,7 @@ class IdentityNormalizer:
         )
 
         if not username or not username.strip():
-            username = "dev_user_1"
+            username = "dev_user"
 
         username = username.strip()
 
@@ -81,36 +85,61 @@ class IdentityNormalizer:
             fallback_environs=["EMAIL", "MAIL"],
         )
 
-        # 3. Extract group memberships header
-        raw_groups_header = (
-            request.headers.get(self.config.header_groups)
-            or request.headers.get("X-Remote-Groups")
-            or (request.environ.get("REMOTE_GROUPS", "") if hasattr(request, "environ") else "")
-        )
-
+        projects: Dict[str, List[str]] = {}
         raw_groups: List[str] = []
-        if raw_groups_header:
-            # Groups may be comma or semicolon separated
+        user_rec = None
+
+        # 3. Resolve groups
+        raw_groups_header = (
+            request.headers.get(self.config.header_groups) if hasattr(self.config, "header_groups") and self.config.header_groups else None
+        ) or request.headers.get("X-Remote-Groups") or (request.environ.get("REMOTE_GROUPS", "") if hasattr(request, "environ") else "")
+
+        if raw_groups_header and raw_groups_header.strip():
             raw_groups = [
                 grp.strip() for grp in re.split(r"[,;]", raw_groups_header) if grp.strip()
             ]
+            projects = self._parse_groups_into_projects(raw_groups)
+        else:
+            source = getattr(self.config, "source", "ldap")
+            if source == "ldap" and self.sync_manager:
+                try:
+                    ldap_logger.info(f"Resolving user '{username}' entitlements from LDAP directory mirror in PostgreSQL")
+                    user_rec, projects, raw_groups = self.sync_manager.get_user_entitlements(username)
+                    # Option A: JIT Fallback if user not yet in DB
+                    if (not user_rec or not projects) and getattr(self.sync_manager.config.sync, "jit_fallback_enabled", True):
+                        ldap_logger.info(f"User '{username}' missing from directory mirror. Executing Option A JIT sync.")
+                        jit_res = self.sync_manager.sync_single_user(username)
+                        if jit_res:
+                            user_rec, projects, raw_groups = self.sync_manager.get_user_entitlements(username)
+                            ldap_logger.info(f"Option A JIT sync succeeded for '{username}'. Granted roles: {projects}")
+                        else:
+                            ldap_logger.warning(f"Option A JIT sync: user '{username}' could not be resolved from LDAP")
+                except Exception as e:
+                    ldap_logger.error(f"Error during LDAP entitlement lookup for '{username}': {e}", exc_info=True)
 
-        # If no raw groups header found, default sample groups for testing/dev user
-        if not raw_groups and username in ("dev_user", "dev_user_1"):
-            raw_groups = ["DAI_ProjectA_DEV", "DAI_ProjectA_APS", "DAI_ProjectB_DEV", "DAI_ProjectB_AUDIT"]
+            # Fallback if in mock mode and no groups found
+            if not projects:
+                if username in ("dev_user", "dev_user_1"):
+                    raw_groups = ["DAI_ProjectA_DEV", "DAI_ProjectA_APS", "DAI_ProjectB_DEV", "DAI_ProjectB_AUDIT"]
+                projects = self._parse_groups_into_projects(raw_groups)
 
-        # 4. Parse projects and roles from group memberships
-        projects = self._parse_groups_into_projects(raw_groups)
+        # Supplement profile from DB user record if headers were empty
+        if user_rec:
+            first_name = first_name or user_rec.first_name
+            last_name = last_name or user_rec.last_name
+            email = email or user_rec.email
 
-        # 5. Compute display name from first_name / last_name or username fallback
+        # 4. Compute display name from first_name / last_name or username fallback
         if first_name and last_name:
             display_name = f"{first_name} {last_name}".strip()
         elif first_name:
             display_name = first_name.strip()
+        elif user_rec and user_rec.display_name:
+            display_name = user_rec.display_name
         else:
             display_name = username.replace("_", " ").title()
 
-        # 6. Determine admin status
+        # 5. Determine admin status
         admin_groups = getattr(self.config, "admin_groups", ["DAI_ADMIN", "GATEWAY_ADMIN", "ADMIN"])
         is_admin = (
             username in ("dev_user", "dev_user_1")

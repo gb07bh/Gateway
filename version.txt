@@ -1,3 +1,16 @@
+1.8.0
+- Independent LDAP directory synchronization worker with RFC 2696 paged searches, SSL/TLS, and Active Directory attribute mapping
+- Dedicated directory configuration in `config/ldap.yaml` and reference sample in `config/ldap.sample.yaml`
+- PostgreSQL schema expansion with `gateway_users`, `gateway_ldap_groups`, `gateway_user_group_membership`, and `gateway_ldap_sync_status` tables
+- Single Sign-On (SSO) decoupling: extracts UID from `header_user` (e.g. `X-Remote-User`) and resolves entitlements from local PostgreSQL in <1ms
+- Option A Just-In-Time (JIT) fallback for instant on-the-fly synchronization of unsynced users upon first authenticated login
+- PostgreSQL session-level advisory locking (`pg_try_advisory_lock`) preventing race conditions across multi-node ALB clusters
+- Dedicated structured logging architecture for LDAP operations: outputs to `logs/ldap.log` and mirrors to `logs/service.log`
+- Admin Management Dashboard (`/admin/ldap`) with real-time health metrics, on-demand sync triggering, entitlements explorer, live YAML configuration editor, and embedded live LDAP log stream
+- Standalone CLI runner `scripts/sync_ldap.py` with `--test`, `--dry-run`, and `--user` support with structured JSON logging for scheduled cron execution
+- REST endpoint `GET /api/v1/ldap/logs` for real-time administrator log monitoring and audit
+- Dedicated LDAP operational and configuration guide (`docs/LDAP_SYNCHRONIZATION_GUIDE.md`)
+
 1.7.0
 - Multi-header SSO identity capturing for segregated user headers (`Uid`, `firstName`, `Lastname`, `email`)
 - Configurable header mapping properties (`header_user`, `header_first_name`, `header_last_name`, `header_email`) in `IdentityConfig` and `gateway.yaml` with automatic alias fallback resolution

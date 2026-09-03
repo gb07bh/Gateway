@@ -1,0 +1,366 @@
+{% extends "base.html" %}
+
+{% block title %}LDAP Directory Management{% endblock %}
+
+{% block content %}
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+    <div>
+        <h1 style="font-size: 1.75rem; margin-bottom: 0.25rem;">👥 LDAP Directory Synchronization & Entitlements</h1>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">
+            Centralized Active Directory / LDAP synchronization status, entitlements explorer, and live configuration.
+        </p>
+    </div>
+    <div style="display: flex; gap: 0.75rem;">
+        <button id="btn-test-conn" class="btn" style="background-color: var(--card-bg); border: 1px solid var(--border);" onclick="testLdapConnection()">
+            🔌 Test Connection
+        </button>
+        <button id="btn-run-sync" class="btn btn-primary" onclick="triggerLdapSync()">
+            🔄 Run Full Sync Now
+        </button>
+    </div>
+</div>
+
+<div id="action-alert" style="display: none; margin-bottom: 1.5rem; padding: 0.85rem 1.25rem; border-radius: 6px; font-size: 0.9rem;"></div>
+
+<!-- STATUS METRIC CARDS -->
+<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 1.5rem;">
+    <div class="card" style="margin-bottom: 0;">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">LDAP Status</div>
+        <div id="metric-status" style="font-size: 1.4rem; font-weight: 700; margin-top: 0.4rem; color: var(--success);">
+            {% if status.enabled %}HEALTHY{% else %}DISABLED{% endif %}
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">
+            {% if status.mock_mode %}(Mock Directory Provider){% else %}{{ status.server_uri }}{% endif %}
+        </div>
+    </div>
+    <div class="card" style="margin-bottom: 0;">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Active Synced Users</div>
+        <div id="metric-users" style="font-size: 1.4rem; font-weight: 700; margin-top: 0.4rem; color: #60a5fa;">
+            {{ status.total_active_users }}
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Persisted in PostgreSQL</div>
+    </div>
+    <div class="card" style="margin-bottom: 0;">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Mapped Groups</div>
+        <div id="metric-groups" style="font-size: 1.4rem; font-weight: 700; margin-top: 0.4rem; color: #c084fc;">
+            {{ status.total_synced_groups }}
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;">Matching Prefix: <code>{{ status.group_prefix }}*</code></div>
+    </div>
+    <div class="card" style="margin-bottom: 0;">
+        <div style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Last Execution</div>
+        <div id="metric-last-run" style="font-size: 1.1rem; font-weight: 600; margin-top: 0.4rem; color: #facc15;">
+            {% if status.last_run %}{{ status.last_run.status }}{% else %}Never Synced{% endif %}
+        </div>
+        <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 0.25rem;" id="metric-last-time">
+            {% if status.last_run and status.last_run.completed_at %}{{ status.last_run.completed_at }}{% else %}Ready{% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- ENTITLEMENTS EXPLORER -->
+<div class="card">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+        <h2 style="margin: 0; font-size: 1.2rem;">🔍 Entitlements Explorer</h2>
+        <div style="display: flex; gap: 0.5rem;">
+            <input type="text" id="user-search" placeholder="Search by UID, name, email..." onkeyup="filterUsers()" 
+                   style="padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.85rem; width: 260px;">
+            <select id="project-filter" onchange="filterUsers()" 
+                    style="padding: 0.4rem 0.8rem; border-radius: 4px; border: 1px solid var(--border); background: var(--card-bg); color: var(--text); font-size: 0.85rem;">
+                <option value="">All Projects</option>
+                {% for proj in projects %}
+                    <option value="{{ proj.project_name }}">{{ proj.project_name }} ({{ proj.total_members }} members)</option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>User ID</th>
+                <th>Full Name</th>
+                <th>Email Address</th>
+                <th>Project & Roles Entitlements</th>
+                <th>Status</th>
+            </tr>
+        </thead>
+        <tbody id="users-table-body">
+            {% for u in users %}
+            <tr class="user-row" data-uid="{{ u.uid|lower }}" data-name="{{ u.display_name|lower }}" data-email="{{ u.email|lower if u.email else '' }}" data-projects="{{ u.projects.keys()|join(',') }}">
+                <td><code>{{ u.uid }}</code></td>
+                <td><strong>{{ u.display_name }}</strong></td>
+                <td>{{ u.email or 'N/A' }}</td>
+                <td>
+                    {% for p, roles in u.projects.items() %}
+                        <div style="margin-bottom: 0.25rem;">
+                            <strong>{{ p }}:</strong>
+                            {% for r in roles %}
+                                <span class="tag {% if r == 'DEV' %}tag-dev{% elif r == 'APS' %}tag-aps{% else %}tag-audit{% endif %}">{{ r }}</span>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <span style="color: var(--text-muted); font-size: 0.85rem;">No active project groups</span>
+                    {% endfor %}
+                </td>
+                <td>
+                    {% if u.is_active %}
+                        <span style="color: var(--success); font-weight: 600;">Active</span>
+                    {% else %}
+                        <span style="color: var(--danger); font-weight: 600;">Inactive</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align: center; color: var(--text-muted); padding: 1.5rem;">
+                    No synced users found in PostgreSQL. Click <strong>Run Full Sync Now</strong> to populate directory.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<!-- LIVE CONFIGURATION EDITOR -->
+<div class="card">
+    <h2 style="margin-bottom: 0.5rem; font-size: 1.2rem;">⚙️ LDAP Directory Configuration (<code>config/ldap.yaml</code>)</h2>
+    <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 1.25rem;">
+        Modify non-secret LDAP parameters below. Credentials remain securely resolved via <code>CredentialResolver</code>.
+    </p>
+
+    <form id="ldap-config-form" onsubmit="event.preventDefault(); saveLdapConfig(event);">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+            <div class="form-group">
+                <label>Server URI</label>
+                <input type="text" id="cfg-server-uri" name="server_uri" value="{{ config.server_uri }}" required>
+            </div>
+            <div class="form-group">
+                <label>Base DN</label>
+                <input type="text" id="cfg-base-dn" name="base_dn" value="{{ config.base_dn }}" required>
+            </div>
+            <div class="form-group">
+                <label>User Search Base (OU)</label>
+                <input type="text" id="cfg-user-base" name="user_search_base" value="{{ config.user_search_base }}">
+            </div>
+            <div class="form-group">
+                <label>Group Search Base (OU)</label>
+                <input type="text" id="cfg-group-base" name="group_search_base" value="{{ config.group_search_base }}">
+            </div>
+            <div class="form-group">
+                <label>Group Prefix (e.g. DAI_)</label>
+                <input type="text" id="cfg-group-prefix" name="group_prefix" value="{{ config.group_prefix }}" required>
+            </div>
+            <div class="form-group">
+                <label>Group CN Attribute</label>
+                <input type="text" id="cfg-group-cn-attr" name="group_cn_attr" value="{{ config.group_cn_attr }}" required>
+            </div>
+            <div class="form-group" style="grid-column: span 2;">
+                <label>Group Search Filter Template</label>
+                <input type="text" id="cfg-filter-template" name="group_filter_template" value="{{ config.group_filter_template }}" required>
+            </div>
+            <div class="form-group">
+                <label>Sync Interval (Minutes)</label>
+                <input type="number" id="cfg-sync-interval" name="interval_minutes" value="{{ config.sync.interval_minutes }}" min="1" max="1440">
+            </div>
+            <div class="form-group">
+                <label>Secret Credential Key (in getCred / Vault)</label>
+                <input type="text" value="{{ config.bind_cred_key }}" disabled style="opacity: 0.7; cursor: not-allowed;">
+            </div>
+        </div>
+
+        <div style="margin-top: 1rem; display: flex; justify-content: flex-end;">
+            <button type="button" class="btn btn-primary" id="btn-save-cfg" onclick="saveLdapConfig(event)">
+                💾 Save Configuration to ldap.yaml
+            </button>
+        </div>
+    </form>
+</div>
+
+<!-- LIVE RECENT LDAP WORKER LOGS -->
+<div class="card" style="margin-top: 1.5rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+        <div>
+            <h2 style="font-size: 1.2rem; margin-bottom: 0.25rem;">📜 Recent LDAP Worker Logs (<code>logs/ldap.log</code>)</h2>
+            <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 0;">
+                Live structured log stream capturing connection tests, sync operations, and Option A JIT lookups.
+            </p>
+        </div>
+        <button type="button" class="btn" style="background-color: var(--card-border); color: var(--text-color); font-size: 0.85rem;" onclick="loadRecentLogs()">
+            ↻ Refresh Logs
+        </button>
+    </div>
+    <div id="ldap-log-container" style="background: #0f172a; border-radius: 8px; padding: 1rem; font-family: 'Consolas', monospace; font-size: 0.82rem; max-height: 280px; overflow-y: auto; color: #cbd5e1; border: 1px solid var(--card-border);">
+        <div style="color: var(--text-muted);">Loading recent logs...</div>
+    </div>
+</div>
+
+<script>
+    function showAlert(msg, isError = false) {
+        const el = document.getElementById("action-alert");
+        el.style.display = "block";
+        el.style.backgroundColor = isError ? "rgba(239, 68, 68, 0.2)" : "rgba(34, 197, 94, 0.2)";
+        el.style.color = isError ? "#f87171" : "#4ade80";
+        el.style.border = isError ? "1px solid #ef4444" : "1px solid #22c55e";
+        el.innerText = msg;
+        setTimeout(() => { el.style.display = "none"; }, 6000);
+    }
+
+    async function testLdapConnection() {
+        const btn = document.getElementById("btn-test-conn");
+        btn.disabled = true;
+        btn.innerText = "Testing...";
+        try {
+            const res = await fetch("/api/v1/ldap/test-connection", { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+                showAlert("✓ LDAP Connection Verified: " + (data.message || "Connected successfully"));
+            } else {
+                showAlert("✗ Connection Failed: " + (data.error || "Unknown error"), true);
+            }
+        } catch (e) {
+            showAlert("✗ Request Error: " + e, true);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "🔌 Test Connection";
+            loadRecentLogs();
+        }
+    }
+
+    async function triggerLdapSync() {
+        const btn = document.getElementById("btn-run-sync");
+        btn.disabled = true;
+        btn.innerText = "Synchronizing...";
+        try {
+            const res = await fetch("/api/v1/ldap/sync", { method: "POST" });
+            const data = await res.json();
+            if (res.ok) {
+                showAlert("✓ Synchronization Completed! Synced " + (data.groups_synced || 0) + " groups, " + (data.users_synced || 0) + " users in " + (data.duration_seconds || 0) + "s");
+                setTimeout(() => { window.location.reload(); }, 1500);
+            } else {
+                showAlert("✗ Sync Failed: " + (data.error || "Execution failed"), true);
+            }
+        } catch (e) {
+            showAlert("✗ Request Error: " + e, true);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "🔄 Run Full Sync Now";
+            loadRecentLogs();
+        }
+    }
+
+    async function saveLdapConfig(event) {
+        if (event && event.preventDefault) {
+            event.preventDefault();
+        }
+        const btn = document.getElementById("btn-save-cfg");
+        btn.disabled = true;
+        btn.innerText = "Saving...";
+
+        const intervalInput = document.getElementById("cfg-sync-interval").value;
+        const intervalNum = parseInt(intervalInput, 10);
+
+        const payload = {
+            server_uri: (document.getElementById("cfg-server-uri").value || "").trim(),
+            base_dn: (document.getElementById("cfg-base-dn").value || "").trim(),
+            user_search_base: (document.getElementById("cfg-user-base").value || "").trim(),
+            group_search_base: (document.getElementById("cfg-group-base").value || "").trim(),
+            group_prefix: (document.getElementById("cfg-group-prefix").value || "").trim(),
+            group_cn_attr: (document.getElementById("cfg-group-cn-attr").value || "").trim(),
+            group_filter_template: (document.getElementById("cfg-filter-template").value || "").trim(),
+            sync: {
+                interval_minutes: isNaN(intervalNum) ? 15 : intervalNum
+            }
+        };
+
+        try {
+            const res = await fetch("/api/v1/ldap/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            const data = await res.json();
+            if (res.ok) {
+                showAlert("✓ Configuration saved to config/ldap.yaml successfully!");
+            } else {
+                showAlert("✗ Failed to save config: " + (data.error || "Unknown error"), true);
+            }
+        } catch (e) {
+            showAlert("✗ Error saving configuration: " + e, true);
+        } finally {
+            btn.disabled = false;
+            btn.innerText = "💾 Save Configuration to ldap.yaml";
+            loadRecentLogs();
+        }
+    }
+
+    function filterUsers() {
+        const query = document.getElementById("user-search").value.toLowerCase().trim();
+        const project = document.getElementById("project-filter").value.trim();
+        const rows = document.querySelectorAll(".user-row");
+
+        rows.forEach(r => {
+            const uid = r.getAttribute("data-uid");
+            const name = r.getAttribute("data-name");
+            const email = r.getAttribute("data-email");
+            const projects = r.getAttribute("data-projects").split(",");
+
+            const matchesText = !query || uid.includes(query) || name.includes(query) || email.includes(query);
+            const matchesProject = !project || projects.includes(project);
+
+            if (matchesText && matchesProject) {
+                r.style.display = "";
+            } else {
+                r.style.display = "none";
+            }
+        });
+    }
+
+    async function loadRecentLogs() {
+        const container = document.getElementById("ldap-log-container");
+        if (!container) return;
+        try {
+            const res = await fetch("/api/v1/ldap/logs");
+            const data = await res.json();
+            if (data.logs && data.logs.length > 0) {
+                container.innerHTML = "";
+                data.logs.forEach(log => {
+                    const row = document.createElement("div");
+                    row.style.marginBottom = "0.35rem";
+                    row.style.display = "flex";
+                    row.style.gap = "0.75rem";
+
+                    const timeSpan = document.createElement("span");
+                    timeSpan.style.color = "#64748b";
+                    timeSpan.style.minWidth = "65px";
+                    timeSpan.innerText = log.timestamp ? log.timestamp.substring(11, 19) : "";
+
+                    const lvlSpan = document.createElement("span");
+                    lvlSpan.style.fontWeight = "bold";
+                    lvlSpan.style.minWidth = "65px";
+                    lvlSpan.style.color = log.level === "ERROR" ? "#ef4444" : (log.level === "WARNING" ? "#f59e0b" : "#3b82f6");
+                    lvlSpan.innerText = "[" + (log.level || "INFO") + "]";
+
+                    const msgSpan = document.createElement("span");
+                    msgSpan.style.color = "#e2e8f0";
+                    msgSpan.style.wordBreak = "break-all";
+                    msgSpan.innerText = log.message || "";
+
+                    row.appendChild(timeSpan);
+                    row.appendChild(lvlSpan);
+                    row.appendChild(msgSpan);
+                    container.appendChild(row);
+                });
+            } else {
+                container.innerHTML = '<div style="color: var(--text-muted);">No log records found yet in logs/ldap.log</div>';
+            }
+        } catch (e) {
+            container.innerHTML = '<div style="color: #ef4444;">Failed to load logs: ' + e + '</div>';
+        }
+    }
+
+    document.addEventListener("DOMContentLoaded", function() {
+        loadRecentLogs();
+    });
+</script>
+{% endblock %}

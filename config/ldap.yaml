@@ -1,0 +1,25 @@
+ldap:
+  enabled: true
+  nested_groups_enabled: false
+  server_uri: ldaps://ad.company.internal:636
+  base_dn: DC=company,DC=internal
+  user_search_base: OU=Users,DC=company,DC=internal
+  group_search_base: OU=Groups,DC=company,DC=internal
+  group_prefix: DAI_
+  group_cn_attr: cn
+  group_member_attr: member
+  group_filter_template: (&(objectClass=group)({group_cn_attr}={group_prefix}*))
+  user_uid_attr: sAMAccountName
+  user_mail_attr: mail
+  user_display_name_attr: displayName
+  user_first_name_attr: givenName
+  user_last_name_attr: sn
+  bind_cred_key: gateway_ldap_bind_account
+  mock_mode: true
+  sync:
+    interval_minutes: 20
+    page_size: 500
+    timeout_seconds: 10
+    jit_fallback_enabled: true
+    incremental: false
+    prune_missing_users: false

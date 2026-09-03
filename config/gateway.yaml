@@ -10,12 +10,14 @@ logging:
   level: "INFO"
 
 identity:
+  source: "ldap"
   header_user: "X-Remote-User"
   header_first_name: "X-First-Name"
   header_last_name: "X-Last-Name"
   header_email: "X-Email"
   header_groups: "X-Remote-Groups"
   group_prefix: "DAI_"
+  ldap_config_path: "config/ldap.yaml"
 
 auth:
   eval_roles:

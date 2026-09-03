@@ -10,6 +10,7 @@ from app.database import DatabaseManager
 from app.housekeeping import HousekeepingManager
 from app.routes.ui import ui_bp
 from app.routes.api import api_bp, health_bp
+from app.routes.ldap_api import ldap_bp
 
 
 def create_app(config_path: Optional[str] = None) -> Flask:
@@ -33,15 +34,6 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     credential_resolver = CredentialResolver()
     app.config["CREDENTIAL_RESOLVER"] = credential_resolver
 
-    identity_normalizer = IdentityNormalizer(config.identity)
-    app.config["IDENTITY_NORMALIZER"] = identity_normalizer
-
-    auth_evaluator = AuthorizationEvaluator(config.auth, config.classification)
-    app.config["AUTH_EVALUATOR"] = auth_evaluator
-
-    active_adapter = AdapterFactory.create_adapter(config.adapters)
-    app.config["ACTIVE_ADAPTER"] = active_adapter
-
     db_manager = DatabaseManager(config.database, lazy_connect=True)
     if config.database.table_creations:
         try:
@@ -50,6 +42,29 @@ def create_app(config_path: Optional[str] = None) -> Flask:
         except Exception as e:
             loggers.db_logger.warning(f"Database auto table creation check deferred/warning: {e}")
     app.config["DB_MANAGER"] = db_manager
+
+    # Instantiate LDAP sync manager if configured
+    app.config["LDAP_LOGGER"] = loggers.ldap_logger
+    ldap_sync_manager = None
+    if getattr(config, "ldap", None) and getattr(config.ldap, "enabled", False):
+        from app.ldap.sync import LdapSyncManager
+        ldap_sync_manager = LdapSyncManager(config.ldap, db_manager, credential_resolver)
+        mode = "mock" if getattr(config.ldap, "mock_mode", False) else "live"
+        loggers.ldap_logger.info(
+            f"LDAP sync engine initialized (mode={mode}, uri={config.ldap.server_uri}, prefix={config.ldap.group_prefix})"
+        )
+    else:
+        loggers.ldap_logger.info("LDAP sync engine is disabled or not configured")
+    app.config["LDAP_SYNC_MANAGER"] = ldap_sync_manager
+
+    identity_normalizer = IdentityNormalizer(config.identity, sync_manager=ldap_sync_manager)
+    app.config["IDENTITY_NORMALIZER"] = identity_normalizer
+
+    auth_evaluator = AuthorizationEvaluator(config.auth, config.classification)
+    app.config["AUTH_EVALUATOR"] = auth_evaluator
+
+    active_adapter = AdapterFactory.create_adapter(config.adapters)
+    app.config["ACTIVE_ADAPTER"] = active_adapter
 
     audit_logger = AuditLogger(loggers.audit_logger, db_manager=db_manager, db_logger=loggers.db_logger)
     app.config["AUDIT_LOGGER"] = audit_logger
@@ -90,5 +105,6 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     app.register_blueprint(ui_bp)
     app.register_blueprint(api_bp)
     app.register_blueprint(health_bp)
+    app.register_blueprint(ldap_bp)
 
     return app

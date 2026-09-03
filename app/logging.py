@@ -98,6 +98,12 @@ class GatewayLoggers:
         self.adapter_logger = self.get_logger("adapter", log_type="adapter")
         self.housekeeping_logger = self.get_logger("housekeeping", log_type="housekeeping")
         self.heartbeat_logger = self.get_logger("heartbeat", log_type="heartbeat")
+        self.ldap_logger = self.get_logger("ldap", log_type="ldap")
+
+        # Also mirror gateway.ldap into service.log for unified service observability
+        svc_handler_ldap = logging.FileHandler(self.log_dir / "service.log", encoding="utf-8")
+        svc_handler_ldap.setFormatter(JsonFormatter(log_type="service", node_id=self.node_id, is_debug=self.is_debug))
+        self.ldap_logger.addHandler(svc_handler_ldap)
 
 
         # Route SQLAlchemy DB queries (DDL create_tables, DML insert/update/select) into database.log and service.log when level is DEBUG

@@ -1,6 +1,6 @@
 import os
 from typing import Dict, Any, Optional
-from sqlalchemy import create_engine, text, Column, String, DateTime, Text
+from sqlalchemy import create_engine, text, Column, String, DateTime, Text, Boolean, Integer, ForeignKey
 from sqlalchemy.orm import sessionmaker, declarative_base
 from datetime import datetime, timezone
 from app.config import DatabaseConfig
@@ -43,6 +43,53 @@ class ExecutionRecord(Base):
     status = Column(String(32), nullable=False)
     details_json = Column(Text, nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class GatewayUser(Base):
+    """PostgreSQL persistent user directory mirror model."""
+    __tablename__ = "gateway_users"
+
+    uid = Column(String(128), primary_key=True)
+    display_name = Column(String(256), nullable=True)
+    first_name = Column(String(128), nullable=True)
+    last_name = Column(String(128), nullable=True)
+    email = Column(String(256), nullable=True)
+    is_active = Column(Boolean, default=True, nullable=False)
+    last_synced_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class GatewayLdapGroup(Base):
+    """PostgreSQL persistent LDAP group directory model."""
+    __tablename__ = "gateway_ldap_groups"
+
+    group_name = Column(String(256), primary_key=True)  # e.g., DAI_ProjectA_DEV
+    group_dn = Column(String(512), nullable=True)
+    project_name = Column(String(128), nullable=False, index=True)
+    role_name = Column(String(64), nullable=False, index=True)
+    last_synced_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class GatewayUserGroupMembership(Base):
+    """PostgreSQL persistent user-to-group membership mapping model."""
+    __tablename__ = "gateway_user_group_membership"
+
+    user_uid = Column(String(128), ForeignKey("gateway_users.uid", ondelete="CASCADE"), primary_key=True)
+    group_name = Column(String(256), ForeignKey("gateway_ldap_groups.group_name", ondelete="CASCADE"), primary_key=True)
+    synced_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+
+class GatewayLdapSyncStatus(Base):
+    """PostgreSQL persistent log of LDAP sync execution runs."""
+    __tablename__ = "gateway_ldap_sync_status"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    status = Column(String(32), nullable=False)  # SUCCESS, FAILED, RUNNING
+    started_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    completed_at = Column(DateTime(timezone=True), nullable=True)
+    users_synced = Column(Integer, default=0)
+    groups_synced = Column(Integer, default=0)
+    highest_usn = Column(String(64), nullable=True)
+    error_message = Column(Text, nullable=True)
 
 
 class DatabaseManager:
