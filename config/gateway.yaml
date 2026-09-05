@@ -1,3 +1,6 @@
+# Operating mode: "local" (mock design without PostgreSQL/LDAP/APIs) or "production" (full enterprise connectivity)
+mode: "local"
+
 server:
   host: "127.0.0.1"
   port: 5510

@@ -50,8 +50,8 @@ class AuditLogger:
             extra={"context": audit_entry},
         )
 
-        # Persist audit record and execution record into PostgreSQL database
-        if self.db_manager:
+        # Persist audit record and execution record into PostgreSQL database (skipped in local mock mode)
+        if self.db_manager and not getattr(self.db_manager, "is_mock", False):
             session = self.db_manager.get_session()
             try:
                 audit_record = AuditLogRecord(
@@ -118,7 +118,7 @@ class AuditLogger:
             extra={"context": audit_entry},
         )
 
-        if self.db_manager:
+        if self.db_manager and not getattr(self.db_manager, "is_mock", False):
             session = self.db_manager.get_session()
             try:
                 audit_record = AuditLogRecord(

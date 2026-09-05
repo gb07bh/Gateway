@@ -1,3 +1,13 @@
+1.9.0
+- Added operational `mode` configuration setting (`"local"` vs `"production"`) in `config/gateway.yaml` and `config/gateway.sample.yaml` (with support for both `.yaml` and `.yml` extensions)
+- Standalone local mock mode design: completely bypasses PostgreSQL database connection pooling, table creations, sessions, and queries via `MockDatabaseManager`
+- Safe local execution: resolves local setup startup failures where PostgreSQL is absent, allowing the application and LDAP admin page (`/admin/ldap`) to load instantly with in-memory mock data
+- Local mode API guarding: functional and downstream APIs (`/api/v1/*`) are disabled with HTTP 503 mock responses while telemetry (`/api/v1/heartbeat`) and OpenAPI schema (`/api/v1/openapi.json`) remain operational
+- Global mock warning banner: rendered across every UI page (`/`, `/dashboard`, `/admin/ldap`, `/monitoring`, `/sso-inspect`, `/docs`, `/swagger`, `/execution/*`): "Warning: This is a mock page and API / etc won't work."
+- UI header indicators: added `LOCAL MOCK MODE` badge and updated heartbeat status pill to display `Local Mock (Alive)`
+- Preserved production mode: when `mode: "production"` is configured, full live PostgreSQL, LDAP, and execution API connectivity operate as standard
+- Comprehensive automated test suite `tests/test_local_mode.py` covering configuration parsing, database bypass, warning banner rendering, API guard, and production mode preservation
+
 1.8.0
 - Independent LDAP directory synchronization worker with RFC 2696 paged searches, SSL/TLS, and Active Directory attribute mapping
 - Dedicated directory configuration in `config/ldap.yaml` and reference sample in `config/ldap.sample.yaml`

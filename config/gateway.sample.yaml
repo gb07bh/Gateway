@@ -7,6 +7,23 @@
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
+# 0. OPERATING MODE
+# ------------------------------------------------------------------------------
+# [IMPORTANCE: CRITICAL] Controls runtime operational environment and connectivity.
+# - "local": Standalone mock mode without external infrastructure dependencies.
+#   * PostgreSQL database is entirely bypassed (no connection pool, no tables, no queries).
+#   * Live Active Directory / LDAP synchronization is disabled.
+#   * Functional APIs (/api/v1/*) are disabled with a 503 mock response.
+#   * Prominent warning banner displayed on every UI page:
+#     "Warning: This is a mock page and API / etc won't work."
+#   * Ideal for local UI development, testing, and setups where PostgreSQL is absent.
+# - "production": Standard enterprise operational mode with full live connectivity.
+#   * Connects to PostgreSQL database for audit logs and execution records.
+#   * Connects to live LDAP / Active Directory.
+#   * All release trigger APIs and pipelines fully enabled.
+mode: "production"
+
+# ------------------------------------------------------------------------------
 # 1. SERVER CONFIGURATION
 # ------------------------------------------------------------------------------
 server:

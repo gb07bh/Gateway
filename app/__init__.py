@@ -34,19 +34,26 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     credential_resolver = CredentialResolver()
     app.config["CREDENTIAL_RESOLVER"] = credential_resolver
 
-    db_manager = DatabaseManager(config.database, lazy_connect=True)
-    if config.database.table_creations:
-        try:
-            db_manager.create_tables()
-            loggers.db_logger.info("Database auto table creation verified (table_creations=true)")
-        except Exception as e:
-            loggers.db_logger.warning(f"Database auto table creation check deferred/warning: {e}")
+    if config.is_local_mode:
+        from app.database import MockDatabaseManager
+        db_manager = MockDatabaseManager(config.database)
+        loggers.service_logger.info("Gateway operating in LOCAL MOCK mode: PostgreSQL database disabled entirely.")
+    else:
+        db_manager = DatabaseManager(config.database, lazy_connect=True)
+        if config.database.table_creations:
+            try:
+                db_manager.create_tables()
+                loggers.db_logger.info("Database auto table creation verified (table_creations=true)")
+            except Exception as e:
+                loggers.db_logger.warning(f"Database auto table creation check deferred/warning: {e}")
     app.config["DB_MANAGER"] = db_manager
 
-    # Instantiate LDAP sync manager if configured
+    # Instantiate LDAP sync manager if configured (disabled in local mock mode)
     app.config["LDAP_LOGGER"] = loggers.ldap_logger
     ldap_sync_manager = None
-    if getattr(config, "ldap", None) and getattr(config.ldap, "enabled", False):
+    if config.is_local_mode:
+        loggers.ldap_logger.info("LDAP sync engine disabled (local mock mode active)")
+    elif getattr(config, "ldap", None) and getattr(config.ldap, "enabled", False):
         from app.ldap.sync import LdapSyncManager
         ldap_sync_manager = LdapSyncManager(config.ldap, db_manager, credential_resolver)
         mode = "mock" if getattr(config.ldap, "mock_mode", False) else "live"
@@ -76,12 +83,33 @@ def create_app(config_path: Optional[str] = None) -> Flask:
         f"Gateway service initialized on node '{config.server.node_id}' with adapter '{config.adapters.active}'"
     )
 
-    # 4. Global identity extraction middleware
+    # 4. Context processor for UI templates (provides is_local_mode and app_mode across all templates)
+    @app.context_processor
+    def inject_mode_context():
+        return {
+            "is_local_mode": config.is_local_mode,
+            "app_mode": config.mode,
+        }
+
+    # 5. Local mock API guard middleware (rejects functional APIs with 503 in local mode)
+    @app.before_request
+    def local_mock_api_guard():
+        if config.is_local_mode and request.path.startswith("/api/v1/"):
+            # Allow heartbeat and openapi specification for telemetry and documentation UI
+            if request.path in ["/api/v1/heartbeat", "/api/v1/openapi.json"]:
+                return
+            return jsonify({
+                "error": "API disabled in local mock mode",
+                "mock_mode": True,
+                "mode": "local",
+                "message": "Gateway is running in local mode. Database, live APIs, and LDAP connectivity are disabled.",
+            }), 503
+
+    # 6. Global identity extraction middleware
     @app.before_request
     def extract_identity_middleware():
         if request.endpoint and any(ep in request.endpoint for ep in ["health", "heartbeat", "ready"]):
             return
-
 
         user_identity = identity_normalizer.extract_identity(request)
         g.user_identity = user_identity

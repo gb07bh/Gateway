@@ -103,8 +103,8 @@ class HousekeepingManager:
 
     def purge_expired_db_records(self, dry_run: bool = False, force: bool = False) -> Dict[str, Any]:
         """Deletes audit logs and execution records older than retention_days if purge_db is enabled or forced."""
-        if not self.db_manager:
-            return {"status": "Database manager not configured", "deleted_audit_records": 0, "deleted_execution_records": 0}
+        if not self.db_manager or getattr(self.db_manager, "is_mock", False):
+            return {"status": "Database disabled in local mock mode", "deleted_audit_records": 0, "deleted_execution_records": 0}
 
         if not force and not getattr(self.config, "purge_db", False):
             return {
@@ -188,8 +188,8 @@ class HousekeepingManager:
         return info
 
     def _get_db_records_info(self) -> Dict[str, Any]:
-        if not self.db_manager:
-            return {"status": "Database manager not configured"}
+        if not self.db_manager or getattr(self.db_manager, "is_mock", False):
+            return {"status": "Database disabled in local mock mode", "audit_records": 0, "execution_records": 0}
         session = self.db_manager.get_session()
         try:
             audit_count = session.query(AuditLogRecord).count()

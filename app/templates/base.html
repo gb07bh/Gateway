@@ -301,9 +301,12 @@
     <header>
         <h1>🚀 Release Gateway</h1>
         <div class="header-right">
+            {% if is_local_mode %}
+            <span style="background-color: #fef3c7; color: #92400e; border: 1px solid #f59e0b; font-weight: 700; font-size: 0.75rem; padding: 0.25rem 0.6rem; border-radius: 4px; letter-spacing: 0.05em;">LOCAL MOCK MODE</span>
+            {% endif %}
             <div id="heartbeat-pill" class="health-pill status-green">
                 <span class="status-dot"></span>
-                <span id="heartbeat-text">Service Alive (5s)</span>
+                <span id="heartbeat-text">{% if is_local_mode %}Local Mock (Alive){% else %}Service Alive (5s){% endif %}</span>
             </div>
             {% if user %}
             <div class="profile-dropdown-wrapper">
@@ -389,6 +392,13 @@
         {% endif %}
     </div>
 
+    {% if is_local_mode %}
+    <div id="mock-mode-banner" style="background: linear-gradient(90deg, #fef3c7, #fde68a); color: #92400e; border-bottom: 2px solid #f59e0b; padding: 0.85rem 2rem; font-weight: 600; text-align: center; font-size: 0.95rem; display: flex; align-items: center; justify-content: center; gap: 0.75rem; box-shadow: 0 2px 4px rgba(0,0,0,0.06);">
+        <span style="font-size: 1.3rem;">⚠️</span>
+        <span><strong>Warning: This is a mock page and API / etc won't work.</strong> (Running in local mock mode without PostgreSQL/LDAP)</span>
+    </div>
+    {% endif %}
+
     <container>
         {% block content %}{% endblock %}
     </container>
@@ -408,7 +418,7 @@
                         missedCount = 0;
                         lastHeartbeatSuccess = Date.now();
                         pill.className = "health-pill status-green";
-                        text.innerText = "Service Alive (5s)";
+                        text.innerText = (data.database_status && data.database_status.includes("MOCK")) ? "Local Mock (Alive)" : "Service Alive (5s)";
                     } else {
                         pill.className = "health-pill status-yellow";
                         text.innerText = "Degraded Service";

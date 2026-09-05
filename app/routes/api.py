@@ -177,14 +177,19 @@ def health_check():
 @health_bp.route("/ready", methods=["GET"])
 def readiness_check():
     """Readiness endpoint evaluating downstream dependencies and database health."""
+    gw_config = current_app.config.get("GATEWAY_CONFIG")
     adapter = current_app.config["ACTIVE_ADAPTER"]
     adapter_health = adapter.check_health()
     
     db_manager = current_app.config.get("DB_MANAGER")
     db_health = db_manager.check_health() if db_manager else {"status": "NOT_CONFIGURED"}
 
+    is_local = gw_config.is_local_mode if gw_config else False
+    ready_status = "READY (MOCK)" if is_local else "READY"
+
     return jsonify({
-        "status": "READY",
+        "status": ready_status,
+        "mode": "local" if is_local else "production",
         "adapter_health": adapter_health,
         "database_health": db_health,
     })
@@ -194,6 +199,9 @@ def readiness_check():
 def heartbeat():
     """Heartbeat endpoint for periodic 5s health monitoring."""
     from datetime import datetime, timezone
+    gw_config = current_app.config.get("GATEWAY_CONFIG")
+    is_local = gw_config.is_local_mode if gw_config else False
+
     adapter = current_app.config.get("ACTIVE_ADAPTER")
     adapter_status = "UP"
     if adapter:
@@ -205,8 +213,8 @@ def heartbeat():
             adapter_status = "DOWN"
 
     db_manager = current_app.config.get("DB_MANAGER")
-    db_status = "UP"
-    if db_manager:
+    db_status = "UP (MOCK)" if is_local else "UP"
+    if db_manager and not is_local:
         try:
             dh = db_manager.check_health()
             if isinstance(dh, dict) and dh.get("status") not in ["HEALTHY", "UP"]:
@@ -214,9 +222,9 @@ def heartbeat():
         except Exception:
             db_status = "DOWN"
 
-    node_id = current_app.config.get("GATEWAY_CONFIG").server.node_id if "GATEWAY_CONFIG" in current_app.config else "gateway-node-01"
+    node_id = (gw_config.server.node_id if gw_config else "gateway-node-01") + (" (local-mock)" if is_local else "")
 
-    status = "UP" if adapter_status == "UP" and db_status == "UP" else "DEGRADED"
+    status = "UP" if adapter_status == "UP" and (db_status in ["UP", "UP (MOCK)"]) else "DEGRADED"
 
     timestamp_str = datetime.now(timezone.utc).isoformat()
 

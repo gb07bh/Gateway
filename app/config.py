@@ -114,6 +114,7 @@ class HousekeepingConfig(BaseModel):
 
 
 class GatewayConfig(BaseModel):
+    mode: str = "production"
     server: ServerConfig = Field(default_factory=ServerConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     identity: IdentityConfig = Field(default_factory=IdentityConfig)
@@ -123,6 +124,11 @@ class GatewayConfig(BaseModel):
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     housekeeping: HousekeepingConfig = Field(default_factory=HousekeepingConfig)
     ldap: Optional[LDAPConfig] = None
+
+    @property
+    def is_local_mode(self) -> bool:
+        """Returns True if Gateway is configured for local standalone mock mode."""
+        return (self.mode or "").strip().lower() == "local"
 
 
 class ConfigValidationError(Exception):
@@ -239,7 +245,14 @@ def load_config(config_path: Optional[str] = None) -> GatewayConfig:
     """Loads and validates YAML configuration from disk."""
     if not config_path:
         base_dir = Path(__file__).resolve().parent.parent
-        config_path = str(base_dir / "config" / "gateway.yaml")
+        primary_path = base_dir / "config" / "gateway.yaml"
+        fallback_path = base_dir / "config" / "gateway.yml"
+        if primary_path.exists():
+            config_path = str(primary_path)
+        elif fallback_path.exists():
+            config_path = str(fallback_path)
+        else:
+            config_path = str(primary_path)
 
     path = Path(config_path)
     if not path.exists():

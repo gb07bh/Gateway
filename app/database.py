@@ -183,3 +183,30 @@ class DatabaseManager:
                 "engine": "postgresql",
                 "error": str(e),
             }
+
+
+class MockDatabaseManager:
+    """Mock database manager for local mode when PostgreSQL is absent. Entirely avoids connecting to any database."""
+
+    def __init__(self, config: Optional[DatabaseConfig] = None):
+        self.config = config or DatabaseConfig()
+        self.is_mock = True
+        self.engine = None
+        self.SessionLocal = None
+
+    def get_session(self):
+        """Raises RuntimeError to prevent accidental database operations in mock mode."""
+        raise RuntimeError("Database session requested in local mock mode (PostgreSQL is entirely disabled).")
+
+    def create_tables(self) -> bool:
+        """No-op in local mock mode."""
+        return False
+
+    def check_health(self) -> Dict[str, Any]:
+        """Returns mock status indicating database is deliberately bypassed."""
+        return {
+            "status": "MOCK",
+            "engine": "none (local mock mode)",
+            "message": "PostgreSQL database is disabled in local mode",
+        }
+
