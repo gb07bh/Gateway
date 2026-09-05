@@ -327,7 +327,7 @@ def get_openapi_spec():
         "openapi": "3.0.0",
         "info": {
             "title": "Digital.ai Release Gateway REST API",
-            "version": "1.7.0",
+            "version": "1.9.0",
             "description": "Secure middleware for Digital.ai release execution, SSO entitlements, and health monitoring."
         },
         "paths": {
