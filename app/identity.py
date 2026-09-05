@@ -68,7 +68,7 @@ class IdentityNormalizer:
         )
 
         if not username or not username.strip():
-            username = "dev_user"
+            username = "dev_user1"
 
         username = username.strip()
 

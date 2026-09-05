@@ -89,12 +89,15 @@ def create_app(config_path: Optional[str] = None) -> Flask:
         f"Gateway service initialized on node '{config.server.node_id}' with adapter '{config.adapters.active}'"
     )
 
-    # 4. Context processor for UI templates (provides is_local_mode and app_mode across all templates)
+    # 4. Context processor for UI templates (provides is_local_mode, app_mode, and admin_groups across all templates)
     @app.context_processor
     def inject_mode_context():
+        raw_admin_groups = getattr(getattr(config, "identity", None), "admin_groups", None)
+        admin_groups = list(raw_admin_groups) if raw_admin_groups else ["DAI_ADMIN", "GATEWAY_ADMIN"]
         return {
             "is_local_mode": config.is_local_mode,
             "app_mode": config.mode,
+            "admin_groups": admin_groups,
         }
 
     # 5. Global identity extraction middleware
@@ -151,7 +154,14 @@ def create_app(config_path: Optional[str] = None) -> Flask:
                 "message": getattr(e, "description", "Administrator privileges required to access this endpoint.")
             }), 403
         user = getattr(g, "user_identity", None)
-        return render_template("403.html", user=user, error=getattr(e, "description", None)), 403
+        raw_admin_groups = getattr(getattr(config, "identity", None), "admin_groups", None)
+        admin_groups = list(raw_admin_groups) if raw_admin_groups else ["DAI_ADMIN", "GATEWAY_ADMIN"]
+        return render_template(
+            "403.html",
+            user=user,
+            error=getattr(e, "description", None),
+            admin_groups=admin_groups,
+        ), 403
 
     @app.errorhandler(404)
     def handle_404(e):

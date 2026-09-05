@@ -21,6 +21,7 @@ identity:
   header_groups: "X-Remote-Groups"
   group_prefix: "DAI_"
   ldap_config_path: "config/ldap.yaml"
+  # admin_groups: ['DIGITALAI_Administrators']
 
 auth:
   eval_roles:

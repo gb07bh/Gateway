@@ -12,7 +12,10 @@
 
     <div style="background: #fef2f2; border: 1px solid #fecaca; border-radius: 6px; padding: 1rem; margin: 1.5rem 0; text-align: left; font-size: 0.88rem; color: #991b1b;">
         <div><strong>Current Identity:</strong> <code>{{ user.username if user else 'anonymous' }}</code></div>
-        <div style="margin-top: 0.25rem;"><strong>Required Entitlement:</strong> Member of <code>DAI_ADMIN</code>, <code>GATEWAY_ADMIN</code>, or role <code>ADMIN</code></div>
+        {% set fallback_groups = ['DAI_ADMIN', 'GATEWAY_ADMIN'] %}
+        {% set effective_groups = admin_groups if (admin_groups is defined and admin_groups) else (config.GATEWAY_CONFIG.identity.admin_groups if (config is defined and config.GATEWAY_CONFIG and config.GATEWAY_CONFIG.identity and config.GATEWAY_CONFIG.identity.admin_groups) else fallback_groups) %}
+        {% set grp_list = effective_groups | reject('equalto', 'ADMIN') | list %}
+        <div style="margin-top: 0.25rem;"><strong>Required Entitlement:</strong> {% if grp_list %}Member of {% for grp in grp_list %}<code>{{ grp }}</code>{% if not loop.last %}, {% endif %}{% endfor %}, or role <code>ADMIN</code>{% else %}Member of <code>DAI_ADMIN</code>, <code>GATEWAY_ADMIN</code>, or role <code>ADMIN</code>{% endif %}</div>
         {% if error %}
         <div style="margin-top: 0.5rem; font-style: italic; color: #b91c1c;">Details: {{ error }}</div>
         {% endif %}
