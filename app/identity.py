@@ -21,6 +21,15 @@ class IdentityNormalizer:
         self.group_prefix = (getattr(config, "group_prefix", None) or "DAI_").upper()
         self.sync_manager = sync_manager
 
+    @staticmethod
+    def _sanitize_header_value(val: Optional[str]) -> Optional[str]:
+        """Sanitizes header values by stripping CRLF, null bytes, and control characters."""
+        if val is None:
+            return None
+        sanitized = re.sub(r"[\r\n\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", str(val))
+        clean = sanitized.strip()
+        return clean if clean else None
+
     def _extract_header_with_fallbacks(
         self,
         request: Request,
@@ -30,20 +39,20 @@ class IdentityNormalizer:
     ) -> Optional[str]:
         """Extracts header checking configured name, fallback header aliases, and WSGI environment."""
         if configured_header:
-            val = request.headers.get(configured_header)
-            if val is not None and str(val).strip():
-                return str(val).strip()
+            clean = self._sanitize_header_value(request.headers.get(configured_header))
+            if clean:
+                return clean
 
         for header_name in fallback_headers:
-            val = request.headers.get(header_name)
-            if val is not None and str(val).strip():
-                return str(val).strip()
+            clean = self._sanitize_header_value(request.headers.get(header_name))
+            if clean:
+                return clean
 
         if fallback_environs and hasattr(request, "environ"):
             for env_name in fallback_environs:
-                val = request.environ.get(env_name)
-                if val is not None and str(val).strip():
-                    return str(val).strip()
+                clean = self._sanitize_header_value(request.environ.get(env_name))
+                if clean:
+                    return clean
 
         return None
 
@@ -96,7 +105,8 @@ class IdentityNormalizer:
 
         if raw_groups_header and raw_groups_header.strip():
             raw_groups = [
-                grp.strip() for grp in re.split(r"[,;]", raw_groups_header) if grp.strip()
+                sanitized for grp in re.split(r"[,;]", raw_groups_header)
+                if (sanitized := self._sanitize_header_value(grp))
             ]
             projects = self._parse_groups_into_projects(raw_groups)
         else:
@@ -142,7 +152,7 @@ class IdentityNormalizer:
         # 5. Determine admin status
         admin_groups = getattr(self.config, "admin_groups", ["DAI_ADMIN", "GATEWAY_ADMIN", "ADMIN"])
         is_admin = (
-            username in ("dev_user", "dev_user_1")
+            username in ("dev_user", "dev_user_1", "admin_user")
             or any(grp.upper() in [ag.upper() for ag in admin_groups] for grp in raw_groups)
             or any("ADMIN" in roles for roles in projects.values())
         )

@@ -5,9 +5,31 @@ from flask import Blueprint, jsonify, request, current_app
 from app.config import save_ldap_config
 from app.ldap.sync import LdapSyncLockError
 from app.database import GatewayUser, GatewayLdapGroup, GatewayUserGroupMembership
+from app.identity import get_current_user
 
 logger = logging.getLogger("gateway.ldap")
 ldap_bp = Blueprint("ldap", __name__, url_prefix="/api/v1/ldap")
+
+
+@ldap_bp.before_request
+def require_admin_for_ldap():
+    """Enforces administrator privileges on all LDAP administration APIs."""
+    user = get_current_user()
+    if not user or not getattr(user, "is_admin", False):
+        audit_logger = current_app.config.get("AUDIT_LOGGER") if current_app else None
+        if audit_logger:
+            username = user.username if user else "anonymous"
+            audit_logger.log_security_event(
+                user=user,
+                action="ADMIN_ACCESS_DENIED",
+                project="SYSTEM",
+                status="DENIED",
+                reason=f"Unauthorized non-admin access attempt to LDAP API '{request.path}' by user '{username}'",
+            )
+        return jsonify({
+            "error": "Forbidden",
+            "message": "Administrator privileges required to access LDAP administration APIs."
+        }), 403
 
 
 @ldap_bp.route("/status", methods=["GET"])

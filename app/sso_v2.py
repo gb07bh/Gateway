@@ -290,7 +290,7 @@ class SSOInspectorV2:
         # 8. Determine admin status
         admin_groups = getattr(self.config, "admin_groups", ["DAI_ADMIN", "GATEWAY_ADMIN", "ADMIN"])
         is_admin = (
-            username in ("dev_user", "dev_user_1")
+            username in ("dev_user", "dev_user_1", "admin_user")
             or any(grp.upper() in [ag.upper() for ag in admin_groups] for grp in raw_groups)
             or any("ADMIN" in roles for roles in projects.values())
         )

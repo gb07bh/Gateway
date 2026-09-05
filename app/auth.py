@@ -1,6 +1,43 @@
+from functools import wraps
 from typing import Dict, List, Optional, Tuple
+from flask import abort, request, jsonify, current_app
 from app.models import UserIdentity, ReleaseExecutionRequest
 from app.config import AuthConfig, ClassificationConfig
+from app.identity import get_current_user
+
+
+def admin_required(f):
+    """
+    Decorator enforcing that the requesting user possesses administrative entitlements
+    (is_admin == True). Rejects unauthorized requests with HTTP 403 Forbidden
+    and logs a security audit event.
+    """
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        user = get_current_user()
+        if not user or not getattr(user, "is_admin", False):
+            # Log security audit event if AUDIT_LOGGER is configured
+            audit_logger = current_app.config.get("AUDIT_LOGGER") if current_app else None
+            if audit_logger:
+                username = user.username if user else "anonymous"
+                audit_logger.log_security_event(
+                    user=user,
+                    action="ADMIN_ACCESS_DENIED",
+                    project="SYSTEM",
+                    status="DENIED",
+                    reason=f"Unauthorized non-admin access attempt to '{request.path}' by user '{username}'",
+                )
+
+            if request.path.startswith("/api/") or request.is_json:
+                return jsonify({
+                    "error": "Forbidden",
+                    "message": "Administrator privileges required to access this endpoint."
+                }), 403
+
+            abort(403, description="Administrator privileges required to access this resource.")
+
+        return f(*args, **kwargs)
+    return decorated_function
 
 
 class AuthorizationError(Exception):

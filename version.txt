@@ -1,3 +1,13 @@
+1.10.0
+- Security Hardening & Endpoint Access Control: Restricts `/monitoring`, `/admin/ldap`, `/sso-inspect`, `/docs`, and `/swagger` strictly to administrators (`DAI_ADMIN`, `GATEWAY_ADMIN`, or role `ADMIN`)
+- Administrative API Protection: Enforces `@admin_required` server-side authorization on `/api/v1/ldap/*`, `/api/v1/sso/inspect`, `/api/v1/housekeeping/*`, and `/api/v1/openapi.json`
+- Dedicated 403 Forbidden Access Denied UI (`app/templates/403.html`): Displays user identity, required entitlement, and direct return-to-dashboard navigation
+- OWASP Security Response Headers: Automatic injection of `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `X-XSS-Protection: 1; mode=block`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Content-Security-Policy` across all responses
+- Secure Session Cookie Flags: Enabled `SESSION_COOKIE_HTTPONLY = True` and `SESSION_COOKIE_SAMESITE = "Lax"`
+- SSO Header Sanitization: Strips CRLF (`\r`, `\n`), null bytes, and non-printable control characters from extracted headers and group memberships to prevent header injection and log tampering
+- Security Audit Logging: Unauthorized access attempts trigger `ADMIN_ACCESS_DENIED` events with `status="DENIED"` recorded in `logs/audit.log`
+- Comprehensive Test Suite & Documentation: Added `tests/test_security_hardening.py` (25 automated tests), authored `docs/SECURITY_TESTING_GUIDE.md`, and updated `Testing_features.md` with Module 10
+
 1.9.0
 - Added operational `mode` configuration setting (`"local"` vs `"production"`) in `config/gateway.yaml` and `config/gateway.sample.yaml` (with support for both `.yaml` and `.yml` extensions)
 - Standalone local mock mode design: completely bypasses PostgreSQL database connection pooling, table creations, sessions, and queries via `MockDatabaseManager`

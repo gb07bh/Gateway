@@ -2,7 +2,7 @@ import json
 from flask import Blueprint, jsonify, request, g, current_app
 from app.identity import get_current_user
 from app.models import ReleaseExecutionRequest
-from app.auth import AuthorizationError, ReleaseClassificationError
+from app.auth import AuthorizationError, ReleaseClassificationError, admin_required
 from app.adapters.base import AdapterError
 
 
@@ -26,6 +26,7 @@ def get_user_profile():
 
 
 @api_bp.route("/sso/inspect", methods=["GET", "POST"])
+@admin_required
 def inspect_sso_v2():
     """SSO V2 Inspection endpoint returning complete header & session identity details."""
     from app.sso_v2 import SSOInspectorV2
@@ -144,6 +145,7 @@ def get_execution_status(execution_id: str):
 
 
 @api_bp.route("/housekeeping/status", methods=["GET"])
+@admin_required
 def housekeeping_status():
     """Returns housekeeping status, disk health, and record metrics."""
     hk_manager = current_app.config.get("HOUSEKEEPING_MANAGER")
@@ -153,6 +155,7 @@ def housekeeping_status():
 
 
 @api_bp.route("/housekeeping/run", methods=["POST"])
+@admin_required
 def run_housekeeping_task():
     """Triggers on-demand housekeeping cleanup."""
     hk_manager = current_app.config.get("HOUSEKEEPING_MANAGER")
@@ -321,13 +324,14 @@ def get_request_by_id(request_id: str):
 
 
 @api_bp.route("/openapi.json", methods=["GET"])
+@admin_required
 def get_openapi_spec():
     """Returns OpenAPI 3.0 specification for API documentation & Swagger UI."""
     return jsonify({
         "openapi": "3.0.0",
         "info": {
             "title": "Digital.ai Release Gateway REST API",
-            "version": "1.9.0",
+            "version": "1.10.0",
             "description": "Secure middleware for Digital.ai release execution, SSO entitlements, and health monitoring."
         },
         "paths": {

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, request, g, redirect, url_for
 from app.identity import get_current_user
+from app.auth import admin_required
 
 ui_bp = Blueprint("ui", __name__)
 
@@ -20,6 +21,7 @@ def execution_detail(execution_id: str):
 
 
 @ui_bp.route("/monitoring")
+@admin_required
 def monitoring():
     """Renders real-time service health and heartbeat monitoring dashboard."""
     user = get_current_user()
@@ -27,6 +29,7 @@ def monitoring():
 
 
 @ui_bp.route("/sso-inspect")
+@admin_required
 def sso_inspect():
     """Renders SSO Header & Entitlement Inspection Console."""
     user = get_current_user()
@@ -35,6 +38,7 @@ def sso_inspect():
 
 @ui_bp.route("/docs")
 @ui_bp.route("/swagger")
+@admin_required
 def swagger_docs():
     """Renders interactive Swagger UI and API request lookup page."""
     user = get_current_user()
@@ -42,6 +46,7 @@ def swagger_docs():
 
 
 @ui_bp.route("/admin/ldap")
+@admin_required
 def ldap_admin():
     """Renders LDAP Directory Synchronization & Entitlements Management dashboard."""
     from flask import current_app

@@ -1,5 +1,5 @@
 from typing import Optional
-from flask import Flask, g, request, jsonify
+from flask import Flask, g, request, jsonify, render_template
 from app.config import load_config, CredentialResolver, GatewayConfig
 from app.logging import GatewayLoggers, setup_request_correlation
 from app.identity import IdentityNormalizer
@@ -20,6 +20,12 @@ def create_app(config_path: Optional[str] = None) -> Flask:
     # 1. Load & validate configuration
     config: GatewayConfig = load_config(config_path)
     app.config["GATEWAY_CONFIG"] = config
+
+    # Secure session cookie configurations
+    app.config["SESSION_COOKIE_HTTPONLY"] = True
+    app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+    if not config.is_local_mode:
+        app.config["SESSION_COOKIE_SECURE"] = True
 
     # 2. Setup structured loggers & request correlation
     loggers = GatewayLoggers(
@@ -91,10 +97,41 @@ def create_app(config_path: Optional[str] = None) -> Flask:
             "app_mode": config.mode,
         }
 
-    # 5. Local mock API guard middleware (rejects functional APIs with 503 in local mode)
+    # 5. Global identity extraction middleware
+    @app.before_request
+    def extract_identity_middleware():
+        if request.endpoint and any(ep in request.endpoint for ep in ["health", "heartbeat", "ready"]):
+            return
+
+        user_identity = identity_normalizer.extract_identity(request)
+        g.user_identity = user_identity
+        g.username = user_identity.username
+
+    # 6. Local mock API guard middleware (rejects functional APIs with 503 in local mode)
     @app.before_request
     def local_mock_api_guard():
         if config.is_local_mode and request.path.startswith("/api/v1/"):
+            # Enforce admin check before mock mode return for admin-only APIs
+            admin_prefixes = ("/api/v1/ldap/", "/api/v1/housekeeping/")
+            admin_exact = ("/api/v1/sso/inspect", "/api/v1/openapi.json")
+            if request.path.startswith(admin_prefixes) or request.path in admin_exact:
+                user = getattr(g, "user_identity", None)
+                if not user or not getattr(user, "is_admin", False):
+                    audit_logger = app.config.get("AUDIT_LOGGER")
+                    if audit_logger:
+                        username = user.username if user else "anonymous"
+                        audit_logger.log_security_event(
+                            user=user,
+                            action="ADMIN_ACCESS_DENIED",
+                            project="SYSTEM",
+                            status="DENIED",
+                            reason=f"Unauthorized non-admin access attempt to '{request.path}' by user '{username}'",
+                        )
+                    return jsonify({
+                        "error": "Forbidden",
+                        "message": "Administrator privileges required to access this endpoint."
+                    }), 403
+
             # Allow heartbeat and openapi specification for telemetry and documentation UI
             if request.path in ["/api/v1/heartbeat", "/api/v1/openapi.json"]:
                 return
@@ -105,17 +142,17 @@ def create_app(config_path: Optional[str] = None) -> Flask:
                 "message": "Gateway is running in local mode. Database, live APIs, and LDAP connectivity are disabled.",
             }), 503
 
-    # 6. Global identity extraction middleware
-    @app.before_request
-    def extract_identity_middleware():
-        if request.endpoint and any(ep in request.endpoint for ep in ["health", "heartbeat", "ready"]):
-            return
-
-        user_identity = identity_normalizer.extract_identity(request)
-        g.user_identity = user_identity
-        g.username = user_identity.username
-
     # 5. Global safe error handlers
+    @app.errorhandler(403)
+    def handle_403(e):
+        if request.path.startswith("/api/") or request.is_json:
+            return jsonify({
+                "error": "Forbidden",
+                "message": getattr(e, "description", "Administrator privileges required to access this endpoint.")
+            }), 403
+        user = getattr(g, "user_identity", None)
+        return render_template("403.html", user=user, error=getattr(e, "description", None)), 403
+
     @app.errorhandler(404)
     def handle_404(e):
         if request.path.startswith("/api/"):
@@ -128,6 +165,18 @@ def create_app(config_path: Optional[str] = None) -> Flask:
         if request.path.startswith("/api/"):
             return jsonify({"error": "Internal server error"}), 500
         return "500 Internal Server Error", 500
+
+    # 6. Global OWASP security response headers
+    @app.after_request
+    def apply_security_headers(response):
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["X-Frame-Options"] = "SAMEORIGIN"
+        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        response.headers["Content-Security-Policy"] = (
+            "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:;"
+        )
+        return response
 
     # 6. Register Blueprints
     app.register_blueprint(ui_bp)
